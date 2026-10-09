@@ -1,22 +1,22 @@
 # curator-session-host: specification
 
-- **Status:** draft r3 (2026-10-10). Nothing has been moved yet.
+- **Status:** draft r4 (2026-10-10). Nothing has been moved yet.
 - **Normative language:** MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
-- **Lineage:** this revision continues the earlier session-host specification and the as-is extraction plan (revision 2, frozen as the reference alternative on 2026-10-05). The owner chose the as-is path on 2026-10-09: extract one to one first, then bring the host to the platform's rules. This revision closes the plan's known gaps, adds the Muse hosts that have since landed, and drops the terminal-backend and `ax` milestones.
-- **Companions:** [curator-dispatcher](https://github.com/relux-works/curator-dispatcher) (admission, allocations, executions; the session-host backend contract), [curator-host-helper](https://github.com/relux-works/curator-host-helper) (agent accounts, the launcher, `exec.stop`), [curator-credential-broker](https://github.com/relux-works/curator-credential-broker), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge) (input producers and output consumers), the platform architecture §5.1 (launch contract), §5.3 (fences and restarts), §7.5 (isolation).
+- **Lineage:** continues the earlier session-host specification and the as-is extraction plan (revision 2, frozen as the reference alternative on 2026-10-05). The owner chose the as-is path on 2026-10-09: extract one to one first, then bring the host to the platform's rules. r3 closed the frozen plan's known gaps; r4 takes the architecture review of r3 (0 P0, 8 P1, 4 P2).
+- **Companions:** [curator-dispatcher](https://github.com/relux-works/curator-dispatcher) (admission, allocations, executions, the session-host backend gate), [curator-host-helper](https://github.com/relux-works/curator-host-helper) (agent accounts, the launcher, `exec.stop`), [curator-credential-broker](https://github.com/relux-works/curator-credential-broker), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge), the platform architecture §5.1, §5.3, §7.5.
 
 ## 1. What the host is
 
-The session host keeps agent sessions alive in the background. It starts a harness in a given directory with a given goal, lets a person attach and detach, delivers messages into a session (the doorbell), and reports events. Today this is `tb-sessiond`, the session manager inside task-board (`tools/board-cli/internal/sessionmanager` in relux-works/skill-project-management).
+The session host keeps agent sessions alive in the background: it starts a harness in a given directory with a given goal, lets a person attach and detach, delivers messages into a session, and reports events. Today this is `tb-sessiond`, the session manager inside task-board (`tools/board-cli/internal/sessionmanager` in relux-works/skill-project-management).
 
-### 1.1 Today, in short *(fact)*
+### 1.1 Today *(fact, at the pinned source)*
 
-- One control plane per board, keyed by `BoardKey`; state in the user state directory; self-restoring start-up.
-- Root (primary) sessions started by `task-board claude|codex`; owner-run sessions for goal-bound spawns.
-- Goals delivered as each harness's native goal; continuation owned by the harness's evaluator.
-- In-session notices: a durable inbox per session, delivered only while a client is attached.
-- Provider hosts behind the `ProviderHost` / `ProviderHostFactory` contract: Claude in a PTY the daemon owns, Codex through a private app-server per session, and Muse (a PTY host and an MSP provider host, landed since the plan's revision 2).
-- A Claude session dies when the daemon is replaced, because the daemon holds its PTY master.
+- One control plane per board, keyed by `BoardKey`; state in the user state directory; self-restoring start-up; one daemon per board.
+- The daemon registers two provider factories: Claude (a PTY the daemon owns) and Codex (a private app-server per session). Codex goals are delivered as text directives; its native goals are disabled.
+- The Muse code is present but not registered: the MSP provider host and the Muse PTY host (`musepty`) exist with their tests; their factory registration and command-line dispatch are later work. The hosted launch route decodes its input and always refuses capability admission.
+- Goals are applied inside the board's write transaction; Claude acknowledges the exact rendered revision; deferred application has an acknowledgement waiter.
+- Notices: a durable inbox per session, written directly by board producers, delivered only while a client is attached.
+- A Claude session dies when the daemon is replaced (the daemon holds the PTY master).
 - Access control: one bearer token in a private file; any process of the operator's user can use it.
 
 ## 2. Phase SH1: extraction as it is
@@ -25,122 +25,159 @@ The first step moves code, not behaviour.
 
 ### 2.1 What moves
 
-| Group | Contents |
-|---|---|
-| provider hosts | the `ProviderHost` / factory contract and optional capabilities; Claude PTY host, output, transcripts, assay and context machinery; Codex host, context, auto-continue and native goals; the Muse PTY host and the MSP provider host with their goals and dispatch |
-| terminal | the terminal relay, attachments, **including resize** |
-| notices | the durable inbox and the delivery pump (the board still produces notices) |
-| records | key, layout, record store, operator log, liveness, resume, repair, quarantine |
-| control | client, control protocol, daemon, manager, takeover guards, detached launch, instance lock, shutdown |
-| context machinery | builder, context, materialization, consumer observation, enforcement key, provider access and proxy, split along §2.3 |
-| daemon skeleton | instance lock, control socket, self-restoring start-up, health reporting, parameterised by a key (today the board key) |
+The complete recursive snapshot of the package and its sub-packages at a pinned source commit, without the source repository's history (the commit is recorded with the move; the NOTICE keeps the original attribution):
 
-The production and test files of the package and its sub-packages move as a snapshot of a pinned source commit, without the source repository's history; the commit is recorded with the move, and the NOTICE keeps the original attribution.
+| Group | Production files | Lines |
+|---|---:|---:|
+| Claude host, output, transcript, context | 9 | 7,852 |
+| Codex host, context, goals, continuation | 4 | 4,295 |
+| Muse MSP client, types, host, dispatch, schema, validation, text goals | 8 | 9,795 |
+| hosted launch scaffold (closed route) | 6 | 964 |
+| terminal (including resize) | 2 | 263 |
+| notices | 2 | 513 |
+| key, layout, records, log, liveness, resume, repair | 7 | 2,133 |
+| host contract, types, launch plan | 3 | 1,151 |
+| goal application, requester, activation, owner operation | 4 | 461 |
+| client, control, daemon, manager, takeover, locks, shutdown | 13 | 6,083 |
+| builder, context, materialisation, access, proxy, enforcement | 30 | 12,006 |
+| `musepty` | 5 | 3,554 |
+| **total production** | **93** | **49,070** |
+| tests (root and `musepty`) | 175 | 95,031 |
+| fixture programs and their test | 3 | 1,682 |
+
+plus 18 non-Go files (the PTY grammar, the captured terminal corpus, schema and dispatch goldens, the hosted diagnostic registry). Inclusion is not activation: the Muse factories stay unregistered and the hosted route stays closed in SH1.
 
 ### 2.2 What stays in task-board
 
-The board and its goal ledger, routing, the spawn runtime, run manifests, acceptance and handoff evidence, repository operations, and the `task-board claude|codex|session|spawn` commands, which keep their names and behaviour and reach the module through the seam of §2.3.
+The board and its goal ledger, routing, the spawn runtime, run manifests, acceptance and handoff evidence, repository operations, the `task-board claude|codex|session|spawn` commands, and **the `tb-sessiond` executable and its composition root** (goal stores, run evidence, context authority, feature gates, local security policy) through C1. The module provides the serving library the composition root calls.
 
 ### 2.3 The seam
 
-In-process Go interfaces exported by the module; the board supplies adapters:
+G, X and Y publish a source-derived disposition for **every** outward surface; an entry may be "retained compatibility service":
 
-- **Sessions:** attach, stop, list, show, open terminal (with initial geometry), **resize terminal**, begin and end owner activation, apply and roll back a goal revision, run an owner turn.
-- **Goal ledger and binding:** the board's adapter keeps its write transaction (get, reconcile with a binding, confirm native applied); the host keeps per-owner serialisation; activation leases keep their crash expiry and idempotent release; promotion failure invokes rollback with joined errors visible.
-- **Context services:** prepare, complete, fail and list materialisations; reclaim and sweep retention; economics, completeness and builder finalisation. The host owns provider forks, writer leases and local evidence; the board's adapter owns authorisation, selection, canonical publication and board-wide lifecycle.
-- **Authority interface** (mandatory; no optional-policy bypass): context, coverage, element, run evidence, retire, publish, recover, retention reports and reclamation confirmation, and the materialisation read snapshot.
-- Closed data types preserve JSON shapes, error precedence, rendering and nil semantics; status, detach, takeover, doctor, notice and client-option calls stay compatibility services until mapped.
+- **29/29** exported client methods, among them attach, stop, list, show, open terminal with initial geometry, resize terminal, owner activation, goal apply and rollback, run owner, the nine context-service methods, and `Close`, `Status`, `RequireGoalReflectionContract`, `Drain`, `Detach`, `Stop`, `TakeOverOwnerSlot`, `Doctor`, `ReconcileOwner`;
+- **45/45** free functions the board's production files reference (connection and version, daemon and factory construction and replacement, launch-plan decoding and rebinding, context construction and gateway, notice, observation and operator-log helpers);
+- **52/52** board and configuration library functions the host calls directly (222 call sites), each given a neutral local implementation or a narrowly typed injected service;
+- the injected contracts: goal ledger (get, reconcile, confirm native applied) and binding (apply, rollback); `GoalPlaneGate`; the deferred goal binding with its acknowledgement waiter and cancellation; the context authority (11 methods and the read snapshot).
 
-Provider success in SH1 means exactly what it means today: Claude acknowledges the exact rendered revision; Codex keeps its text-directive delivery; Muse keeps the behaviour its accepted adapter defines. No new capability is invented in SH1.
+The file-backed notice API stays as it is in SH1.
 
-### 2.4 The gate
+**Two authorities, kept apart.** The board's adapter authorises board facts: target, run, ancestry and publication. The host keeps its **independent machine-local context policy**: local clearance, builder allowlist, payload mode and enforcement key, from local configuration and the authenticated transport, never from a board record; with its fail-closed defaults and ordering, before launch and before restore-for-cleanup, and with absence distinguished from a read error. Denial tests are bound to the production path across the converters.
 
-- **F (feasibility, first).** Prove the final package graph: the unchanged task-board tests run against the module through a disposable pinned board checkout with the production sources projected at their original path; only declared deterministic import and type adapters are allowed; no test edits, no golden regeneration, no extra skips; every test and fixture is hashed; deliberate mutations of the moved code fail the unchanged tests. If F fails, SH1 stops at the mechanical compatibility milestone and the board keeps its dependencies.
-- **Done when:** task-board's session, goal and notice suites pass unchanged against the module; the goldens of every harness are byte-identical; the operator commands behave as before; the module's own CI (vet, race, Unix conformance) is green; any behaviour difference is either removed or listed and accepted by the owner.
+Provider success means exactly what it means today: Claude's exact acknowledgement and deferral; Codex's text directives; Muse's accepted adapter behaviour (unregistered).
 
-### 2.5 Landings
+### 2.4 The gate: three lanes
 
-| Landing | Content |
-|---|---|
-| F | feasibility proof, baseline, module CI |
-| O | the snapshot copy and its provenance review (leak scan before the first public push) |
-| G | goal and configuration converters |
-| X, Y | context boundaries (X: materialisation and authority reads; Y: retention, economics, finalisation) |
-| Z | dependency exit and release packaging (immutable module tags, no local replacements) |
-| C1 | board delegation through the seam, paired release manifest, cutover |
+- **Lane 1, projection.** The unchanged task-board tests run against the candidate's production sources projected at their original import path in a disposable pinned board checkout; only declared deterministic import and type adapters; test bytes, fixtures and goldens unchanged and hashed; discovered, executed, skipped and tagged-test inventories published; the guard tests' targets reached versus expected reported.
+- **Lane 2, consumer.** A real board build against the **immutable module tag** with no local replacement, exercising the converters, the daemon composition and the command-line behaviour; the board's whole CI (configuration, board, vendor drift, build and document guards, all CLI packages, server and regression scenarios), not only the session subsets.
+- **Lane 3, module.** The module's own vet, race and declared macOS and Linux conformance.
+- **Mutations.** Deliberate mutations of the projected code, the real converters and each relevant guard path must each fail a named test.
+- **F**, the first landing, proves a representative final graph on lanes 1 and 2 before the neutral interfaces are committed; Z and C1 rerun all three lanes against the released candidate. If F fails, SH1 stops at the mechanical compatibility milestone and the board keeps its dependencies.
+- **Not evidence of more than it is:** existing opt-in smoke tests (MSP, schema export, PTY) and tagged mutation lanes keep their opt-in status; SH1's suites say nothing about the platform canons of §3.
 
-### 2.6 Freeze and forward-porting
+### 2.5 Order of work
 
-- Before O, the package is frozen in task-board for the copy window, scheduled with the board's arbiter after the Muse work currently landing in the package (expected around 13–14 October). Until then the move is rebased over upstream changes.
-- After O, the old source is frozen: every change in flight gets an accepted commit, a destination and one named forward-port integrator in a freeze manifest. No second runtime is authored in parallel.
+1. Confirm the graph and composition choice (§2.2).
+2. **F**: prototype the three-lane proof; record the board commit, host tree, projection generator, helper, test and fixture hashes, module graph and environment; F stays provisional until the copy snapshot closes.
+3. Schedule the freeze with the board's arbiter, after the Muse work currently landing in the package (expected around 13–14 October); pin the accepted source.
+4. **O**: the snapshot copy; provenance review and leak scan before the first public push.
+5. **G** and **X** (in parallel only on disjoint, frozen contracts), then **Y**.
+6. **Z**: dependency exit, immutable tag, no local replacements; rerun the lanes.
+7. Consumer validation on the tag; **C1** after the calendar gate.
 
-### 2.7 Cutover
+After O the old source is frozen: each change in flight gets its accepted commit, destination commit, one named forward-port integrator and a validation identity in the freeze manifest; active reviews finish on their original base; after every accepted forward port the baseline is regenerated and the affected evidence rerun. No second runtime is authored in parallel.
+
+### 2.6 Cutover (C1)
 
 - Not before the board's conference window ends (19 October).
-- A paired release manifest names the board build, the module tag, the wire, goal and storage schema versions, and the permitted reader and writer pairs. The board build stamp stays in the daemon version during SH1; the host identity is reported separately.
-- The initial cutover is the operator's act inside a maintenance slot: stop the daemon outside any hosted session, prove absence, snapshot state, install the paired binaries, start with one writer; the replacement guard stays. Rollback opens mutable state only after proving the old reader accepts every retained schema; otherwise it stays stopped with records intact.
+- **Quiescence for the whole transaction.** Before stopping the daemon, the operator closes every entry path for the affected boards: the wrappers' automatic daemon start, scheduled and recovery starts, active board runners and operator entry points, using the host's existing maintenance controls. Exclusive state ownership is held and re-checked through snapshot, binary swap, start and health verification. If quiescence cannot be established, cutover is deferred.
+- A paired release manifest names the board build, the module tag, the wire, goal and storage schema versions, and the permitted reader and writer pairs; the board build stamp stays in the daemon version, the host identity is reported separately.
+- The operator performs the swap inside a maintenance slot; the replacement guard stays; the system reopens only with the paired identity and one verified writer.
+- Disposable acceptance covers late starts by old clients and all four old/new wrapper and daemon pairings.
+- Rollback opens mutable state only after proving the old reader accepts every retained schema, and never erases later records by restoring an old snapshot.
 
 ## 3. Phase SH2+: platform canons
 
-After SH1, behaviour changes land one gate at a time.
+Each item below is an **activation gate**: it is designed and tested before it is switched on, and SH1's unchanged tests are not evidence for it.
 
-### 3.1 Access control (first)
+### 3.1 Service account, state and capabilities
 
-- The host runs under its own service account `swarma-host` (home `/opt/swarma/services/swarma-host`).
-- Its socket lives in a private directory under `/opt/swarma/run/host/`; every connection is identified by the kernel-reported peer UID, as in broker §4.1.
-- Each session gets a scoped, revocable capability: a session acts on itself and its own children; operator calls carry the operator's own authority; a supervision matrix decides who may stop, park or attach to whom; every call is audited.
+- The host moves to its own service account `swarma-host` (home `/opt/swarma/services/swarma-host`) only after the direct file APIs (notice inbox writes, context-state reads by the board) are replaced by authenticated calls, and only together with agent-account holders (§3.2). Running harnesses as the service account is not a boundary.
+- The socket directory `/opt/swarma/run/host/` has published permissions that let authorised principals connect while the data stays private. Connections follow broker §4.1: kernel peer UID, server identity check, close-on-exec, one role per connection; managed principals by `(uid, generation)`.
+- Capabilities: issued by the host to a logical session and its execution, with audience, actions, expiry and revocation; parent and child relationships are authoritative host records; replacement rotates execution-scoped authority; controller epochs are reconciled before effects. The legacy global token is refused after activation. Trusted audit and transcript evidence lives at the service boundary, not in agent-writable files.
 
-### 3.2 Holders under agent accounts
+### 3.2 Holders under agent accounts and the process tree
 
-- A hosted session runs under its agent's OS account. The host never runs `sudo -u`; it asks for a start through the host launcher with a **launch ticket** issued by the dispatcher for that generation and execution (dispatcher §12). The launcher accepts a host launch only with a valid, unused ticket.
-- The executor `curator-executor` runs first under the agent account, leases the credential and execs the harness; the host keeps the terminal through a per-session holder process so that a host restart no longer kills Claude sessions.
+Before holders are activated, the ownership table is frozen:
 
-### 3.3 Admission, fences and epochs
+| Concern | Owner |
+|---|---|
+| the PTY master or app-server transport | an agent-side holder: `curator-executor` in holder mode, started by the launcher under the agent account |
+| the credential lease client (renewals for Codex app-server) | the same agent-side holder, for the whole execution |
+| durable metadata, logs, receipts | the host service |
+| admission, allocation and execution records, cleanup | the dispatcher |
+| stop | the dispatcher, through the helper's `exec.stop` (no stop through sudo) |
 
-- The dispatcher admits and records executions; the host owns holding, readiness, exit receipts and fences. Calls between them carry `(logical_session_id, execution_id, controller_epoch, op_id)`.
-- A durable per-session fence (`open`, `closed`, `update_lock`) is checked atomically with every start, wake, retry and probe; a supervisor start increments the controller epoch, and holders accept commands only from the current epoch.
-- An atomic node-wide admission (permits serialised with admission closure) protects updates: closing admission fences new permits and accounts for outstanding ones; an unknown permit keeps ownership; only the operator clears an update lock.
-- Ordinary controlled restart has its own durable closure, acquired atomically with the permits, retained across replacement and released after authenticated start-up reconciliation (gap D1).
+- The holder talks to the host over an authenticated channel compatible with the launcher's descriptor rules (plan on descriptor 3, nothing else inherited); a replacement host re-authenticates and reconnects.
+- Dispatcher recovery distinguishes an absent controller, a live authenticated holder, an absent execution and unknown evidence; only confirmed absence permits replacement or cleanup. Controller-only re-adoption keeps the execution id; a new exec gets a new one.
+- Start, readiness and exit receipts are acknowledged and replayable; capacity release follows confirmed absence.
 
-### 3.4 Delivery, park, emergency stop
+### 3.3 Backend activation with the dispatcher and the helper
 
-- Doorbell modes: `next_turn` by default, `steer` into a running turn where the harness can take it, `interrupt` only for halt, park and emergency stop. Delivery no longer waits for an attached client; the event stream makes detached turns visible.
-- Park: the session writes a handoff note bound to the board goal revision, and the next start resumes from it.
-- Emergency stop: a separate, unmistakable operator command with a board snapshot first.
+Enabled only with jointly pinned host, dispatcher and helper versions:
 
-### 3.5 Probes and harness updates
+- the ticket schema and signature, issuer and host binding, canonical plan digest, executor, expiry, active generation and live claim; redemption journaled atomically with the launch intent and receipt; a lost reply resolved by the same effect id and receipt, never a second start; a defined cancel-versus-redemption interlock;
+- a helper `host` role that may redeem tickets for generations the dispatcher owns;
+- identities kept distinct: account generation, execution id, ticket epoch, and the backend's controller epoch;
+- the interactive and resume subset negotiated explicitly (dispatcher v0 refuses them);
+- negative cases: wrong principal, replay, altered plan or executor, expired or revoked claim, crash on each acknowledgement.
 
-Runtime capability and resume probes stay disabled until they run with the same isolation as the adapter probe (a sandbox or central qualification), with authenticity and known-bad checks before execution, a registered attempt, an unchanged original state on failure and proven teardown (gap D2). There is no unsandboxed local execution of a fresh harness build.
+### 3.4 Effects, fences and admission
+
+- **Effect matrix.** Every effect — enqueue, deliver, steer, interrupt, goal and control calls, attach, start, wake, retry, probe, holder re-adoption — has its fence and epoch rule and idempotent `op_id` behaviour. A closed fence may queue but not deliver; only the operation holding the fence may restart; an explicit stop stays stopped; after a controller failure nothing writes to holders before reconciliation.
+- **One node admission authority** relates the dispatcher's capacity and execution claims, the host's fences, ticket redemption and the permits held through start or verified re-adoption. Every starter is inventoried (board runners, manual and alias launchers, restart and recovery consumers, probes, retries, fallback legs, mixed-version clients); an unsupported participant blocks shared mutation. Unknown permits stay owned; unreadable state is closed; ordinary restart closure is separate from an operator's update lock, which only the operator clears.
+
+### 3.5 Park, restart, emergency stop, board completion
+
+- **Park** is a durable operation: the board acknowledges a committed goal revision that carries the handoff reference (compare-and-swap); the note attempt is bounded, with an explicitly marked snapshot fallback; a timeout never proves drain.
+- **Restart** follows the architecture's transaction: drain external effects and child tools, confirm process and native-lock absence, check binding, posture, authentication, grants and runtime, initialise under a closed fence, reconcile unknown delivery, then reopen.
+- **Recovery matrix:** provider × owner kind (primary, owner-run) × source record (hosted, legacy) × recovery mode, each row with its fresh plan and credential supply, authority, home and native identity and readiness checks; unsupported rows stay visibly parked or refused; legacy ambient environments are never replayed into the new account.
+- **Board completion** is a separate barrier: an execution's exit never satisfies the board's `wait`; exit receipts are durable and replayable.
+- **Emergency stop:** an operator command with defined scope and authority, a board snapshot first, fence and absence receipts, and explicit recovery rather than automatic restart.
+
+### 3.6 Existing probes
+
+SH1 preserves the existing adapter paths as they are: Muse PTY's `--version` preflight, the MSP initialize handshake and its identity check, and the last-known-good fallback start. They do not meet the platform's isolation rule. Before platform activation each startup, resume, probe and fallback path gets an adopted qualification policy: approved artifact identity before exec, isolated state or central qualification, a registered attempt, exact result binding and confirmed teardown; each fallback leg gets its own admitted execution. Without that evidence the new platform route refuses.
 
 ## 4. Estimates
 
-Measured velocity in this stream (2026-10-09): a small accepted change takes 3–4 hours from producer start to landing; with one rework and base movement 10–12 hours; a large change can take four or five revisions; two runs at a time on the shared host.
+Stated velocity (2026-10-09): a clean accepted change takes 3–4 hours from producer start to landing; one rework or base movement makes it 10–12 hours; two runs at a time on the shared host. These are serial sums, not commitments; the landing time is already inside the rate.
 
-| Step | Work | Elapsed |
-|---|---|---|
-| SH1 in the module's own CI | F (about half a day), O with provenance review, G, X, Y, Z | 3–4 days without large reworks, 5–7 days realistically |
-| SH1 cutover into task-board | C1, paired manifest, maintenance slot | 1–2 days, after 19 October |
-| SH2+ | access control, holders under agent accounts with launch tickets, fences and epochs, admission, park and stop | about 15–25 changes; 1.5–2.5 weeks |
+| Work | All clean | One rework each |
+|---|---:|---:|
+| SH1 module landings F, O, G, X, Y, Z | 18–24 landing-hours | 60–72 landing-hours |
+| C1 consumer cutover | plus a maintenance slot after 19 October | |
+| SH2+ (15–25 changes across host, dispatcher and helper) | 45–100 landing-hours | 150–300 landing-hours |
 
-## 5. Known gaps from the frozen plan, and their disposition
+With continuous agent coverage, SH1 fits in 3–4 calendar days clean and about 5–7 with rework, if F passes; SH2+ in about 1.5–2.5 weeks clean. The critical path is the jointly versioned host, dispatcher and helper activation (§3.2–3.3) and the consumer acceptance, not the copy. CI times are measured at F and added only where they are not already inside the rate.
 
-| Gap | Disposition |
+## 5. Dispositions
+
+| Item | Disposition |
 |---|---|
-| R1: the neutral terminal seam dropped resize | resize is part of the Sessions seam (§2.3); the existing resize test binds to it |
-| D1: controlled restart needs its own durable closure | §3.3 |
-| D2: probe isolation | probes stay disabled until isolated (§3.5) |
-| cutover through the private fork | superseded: the module is public; the board consumes a tagged module through C1 |
-| deployment is the operator's act | §2.7 |
-| CI capacity | the module runs on GitHub-hosted runners; re-measure CI waits at F |
-| update-lock clearance is the operator's alone | §3.3 |
-| calendar gate | the board's window ends 16 October; this plan keeps 19 October as its margin (owner decision 2026-10-09) |
-| budget gate | the estimates assume codex capacity; a budget stop extends them |
+| frozen-plan gap R1 (resize) | §2.3 |
+| D1 (restart closure) | §3.4 |
+| D2 (probe isolation) | §3.6 |
+| cutover through the private fork | superseded: the board consumes a tagged public module through C1 |
+| operator-only deployment and update-lock clearance | §2.6, §3.4 |
+| CI capacity | GitHub-hosted runners for the module; the board's own CI for the consumer lane |
+| calendar gate | 19 October (owner decision 2026-10-09) |
+| r3 review F1–F12 | §1.1 and §2.1 (F1), §2.3 (F1, F2), §2.4 (F3), §2.2 and §2.5 (F4), §2.6 (F5), §3.3 (F6), §3.2 (F7), §3.1 (F8), §3.4 (F9), §3.5 (F10), §3.6 (F11), §4 (F12) |
 
 ## 6. Out of scope
 
-Terminal backends other than the per-session PTY holder (tmux), the `ax` backend, the three-operating-system demo, GUI and mobile distribution.
+Terminal backends other than the per-session holder (tmux), the `ax` backend, the three-operating-system demo, GUI and mobile distribution.
 
 ## 7. Open questions
 
-1. Whether the module also absorbs `tb-sessiond`'s binary and command line in SH1, or task-board keeps building the daemon until C1.
-2. Which board key replaces `BoardKey` once one host serves every board on a node.
+1. Which board key replaces `BoardKey` once one host serves every board on a node (must be settled before multi-board admission and capabilities in SH2+).
