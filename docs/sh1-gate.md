@@ -138,7 +138,8 @@ file is restored before the next mutation or any reported command error.
 
 A kill requires a nonzero command exit, exactly one completed named test
 execution with a failure terminal, and its package failure. Baseline admission
-requires exactly one completed passing execution of every named test. Compile failures, malformed logs, another test failing, and
+requires exactly one completed passing execution of every named test. Compile
+failures, malformed logs, another test failing, and
 survivors do not count as kills. Reports retain actual exit codes, before/after
 hashes, killed/survived/unknown statuses and a measured kill ratio. Any surviving
 or unknown mutation exits 1 after writing the report. The fixture proves both
@@ -156,16 +157,14 @@ the candidate module. Existing unrelated replacements remain caller-owned.
 Conflicting bytes at a published proxy version are refused.
 
 Runs effective module selection, download and module graph commands with a
-fresh module cache, GOWORK off,
-only this file proxy, and the checksum server disabled for the local synthetic
+fresh module cache, GOWORK off, only this file proxy, and the checksum server disabled for the local synthetic
 publication. Records command exit codes, the two candidate go.sum lines, the
 module graph, proxy file hashes and consumer file hashes. Selection from
-`go list -mod=mod -m -json all` must equal the requested pseudo-version; a higher MVS minimum
-refuses. Checksums must have exactly the candidate zip and `/go.mod` keys for
+`go list -mod=mod -m -json all` must equal the requested pseudo-version; a higher
+MVS minimum refuses. Checksums must have exactly the candidate zip and `/go.mod` keys for
 that version and match `go mod download -json`. Historical and unrelated
 checksum lines are preserved and excluded from the candidate checksum pair.
-A v0 pseudo-version
-labels a disposable candidate; the synthetic timestamp/revision in the example
+A v0 pseudo-version labels a disposable candidate; the synthetic timestamp/revision in the example
 is not an attestation of a real release. Private workflows derive those values
 from the pinned candidate commit. Later release gates use immutable tags and
 normal release checksum policy.
@@ -268,6 +267,7 @@ kills and compile/unrelated-failure refusals remain in the same suite.
 | [38015721398](https://github.com/relux-works/curator-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
 | [38015843173](https://github.com/relux-works/curator-session-host/actions/runs/38015843173), strengthened refusal tests | 31 s | 43 s | Both green |
 | [38016057110](https://github.com/relux-works/curator-session-host/actions/runs/38016057110), implementation and workflow verification | 43 s | 62 s | Both green |
+| [38019374197](https://github.com/relux-works/curator-session-host/actions/runs/38019374197), revision 2 regressions and narrowing proof | 42 s | 48 s | Both green |
 
 Durations are measured from the hosted jobs' started/completed timestamps,
 including setup and artifact upload. All recorded snapshots passed every
