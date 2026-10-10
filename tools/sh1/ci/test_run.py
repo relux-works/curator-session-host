@@ -2,6 +2,8 @@ import copy
 import importlib.util
 from pathlib import Path
 import unittest
+import sys
+import tempfile
 
 spec = importlib.util.spec_from_file_location("lane", Path(__file__).with_name("run.py"))
 lane = importlib.util.module_from_spec(spec)
@@ -59,3 +61,17 @@ class InventoryAdmissionTests(unittest.TestCase):
         self.assertIn('self.summary["failures"].extend(admit_inventory(inventory))', source)
         self.assertNotIn("-run", lane.TEST_COMMAND)
         self.assertNotIn("-short", lane.TEST_COMMAND)
+
+
+class CommandEvidenceTests(unittest.TestCase):
+    def test_nonzero_exit_survives_malformed_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            instance = lane.Lane.__new__(lane.Lane)
+            instance.host = instance.board = instance.temp = Path(directory)
+            instance.summary = {"commands": [], "failures": []}
+            events = Path(directory) / "events.jsonl"
+            with self.assertRaises(ValueError):
+                instance.command([sys.executable, "-c", "print('malformed'); raise SystemExit(7)"],
+                                 required=False, events=events)
+            self.assertEqual(instance.summary["commands"][0]["exit"], 7)
+            self.assertEqual(events.read_text(), "malformed\n")

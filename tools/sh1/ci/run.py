@@ -106,6 +106,10 @@ class Lane:
         # Raw output can contain board code; it stays in job logs, never artifacts.
         out = result.stdout.decode(errors="replace")
         err = result.stderr.decode(errors="replace")
+        row = {"command": [self.safe(a) for a in args], "exit": result.returncode,
+               "duration_seconds": round(time.monotonic() - started, 3)}
+        self.summary["commands"].append(row)
+        print("EXIT", result.returncode, flush=True)
         if events:
             events.write_bytes(result.stdout)
             print(self.safe(out), end="")
@@ -118,10 +122,6 @@ class Lane:
         else:
             print(self.safe(out), end="")
         print(self.safe(err), end="", file=sys.stderr)
-        row = {"command": [self.safe(a) for a in args], "exit": result.returncode,
-               "duration_seconds": round(time.monotonic() - started, 3)}
-        self.summary["commands"].append(row)
-        print("EXIT", result.returncode, flush=True)
         if result.returncode and required:
             self.summary["failures"].append(row)
             raise RuntimeError("command refused: " + " ".join(row["command"]))
@@ -176,17 +176,12 @@ class Lane:
             {"package": PACKAGE, "test": "TestTheMutantInventoryCoversEveryPredicateOnTheRefusalPath",
              "targets": ["hosted_takeover_guard.go"]}],
             "opt_in": [
-                {"package": PACKAGE, "test": "TestClaudeLiveSmoke", "condition": "TASK_BOARD_CLAUDE_LIVE_SMOKE=1 and qualified Claude binary"},
-            ]}
-        # Declare only names present at this source revision; unknown names refuse.
-        declaration["opt_in"] = []
-        for filename, condition in (("claude_live_smoke_test.go", "TASK_BOARD_CLAUDE_LIVE_SMOKE=1 and trusted project and Claude binary"),
-                                    ("muse_real_provider_test.go", "TASK_BOARD_MUSE_REAL_PROVIDER=1 and qualified TASK_BOARD_MUSE_SMOKE_BIN")):
-            import re
-            for name in re.findall(r"^func (Test\w+)\(t \*testing\.T\)",
-                                   (self.checkout / "internal/sessionmanager" / filename).read_text(), re.M):
-                if "Smoke" in name or "RealProvider" in name:
-                    declaration["opt_in"].append({"package": PACKAGE, "test": name, "condition": condition})
+                {"package": PACKAGE, "test": name, "condition": condition}
+                for name, condition in (
+                    ("TestClaudeHostLiveSmoke", "TASK_BOARD_CLAUDE_LIVE_SMOKE=1 and trusted project and Claude binary"),
+                    ("TestClaudeAdoptionLiveSmoke", "TASK_BOARD_CLAUDE_LIVE_SMOKE=1 and trusted project and Claude binary"),
+                    ("TestMuseRealProviderBudgetPause", "TASK_BOARD_MUSE_REAL_PROVIDER=1 and qualified TASK_BOARD_MUSE_SMOKE_BIN"),
+                )]}
         guards = self.temp / "guard-declaration.json"
         write(guards, declaration)
         self.summary["guard_declaration_hash"] = sha(guards)
