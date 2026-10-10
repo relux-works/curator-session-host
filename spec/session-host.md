@@ -1,6 +1,6 @@
 # curator-session-host: specification
 
-- **Status:** draft r4 (2026-10-10). Nothing has been moved yet.
+- **Status:** draft r4 (2026-10-10; §3.7 wake and liveness added the same day). Nothing has been moved yet.
 - **Normative language:** MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 - **Lineage:** continues the earlier session-host specification and the as-is extraction plan (revision 2, frozen as the reference alternative on 2026-10-05). The owner chose the as-is path on 2026-10-09: extract one to one first, then bring the host to the platform's rules. r3 closed the frozen plan's known gaps; r4 takes the architecture review of r3 (0 P0, 8 P1, 4 P2).
 - **Companions:** [curator-dispatcher](https://github.com/relux-works/curator-dispatcher) (admission, allocations, executions, the session-host backend gate), [curator-host-helper](https://github.com/relux-works/curator-host-helper) (agent accounts, the launcher, `exec.stop`), [curator-credential-broker](https://github.com/relux-works/curator-credential-broker), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge), the platform architecture §5.1, §5.3, §7.5.
@@ -148,6 +148,23 @@ Enabled only with jointly pinned host, dispatcher and helper versions:
 ### 3.6 Existing probes
 
 SH1 preserves the existing adapter paths as they are: Muse PTY's `--version` preflight, the MSP initialize handshake and its identity check, and the last-known-good fallback start. They do not meet the platform's isolation rule. Before platform activation each startup, resume, probe and fallback path gets an adopted qualification policy: approved artifact identity before exec, isolated state or central qualification, a registered attempt, exact result binding and confirmed teardown; each fallback leg gets its own admitted execution. Without that evidence the new platform route refuses.
+
+### 3.7 Wake and liveness
+
+No hosted agent re-arms its own wake-up; there is no `wait` for the model to forget.
+
+| Responsibility | Owner |
+|---|---|
+| receive mail for an agent identity and hold it durably | the bridge (carrier provider and Mailbox); it enqueues into the host's per-session inbox and counts delivery only after the host's durable write |
+| decide when to deliver (the doorbell) | the host, the only writer of a session's input; it delivers at a turn boundary |
+| report the turn boundary, idleness and heartbeats | the holder (§3.2), through the adapter's readiness grammar: Claude PTY or stream output, Codex app-server turn events; an unknown readiness parks rather than guesses |
+| detect a wedged session | the host: pending inbox items, and the session neither idle nor progressing past its deadline |
+| recover | the host's restart transaction (§3.5) under a new controller epoch, then redelivery, idempotent by sender and message id; the dispatcher only for execution absence and cleanup (§3.2) |
+| never woken | an explicitly stopped or parked session, a closed fence (it queues, it does not deliver), a session that needs re-authentication (parked) |
+
+A wake is an effect in the §3.4 matrix: fenced, epoch-checked, with an idempotent `op_id`. The binding from an agent identity to a session names the session, the execution and the epoch, so a wake after a restart never reaches a stale session. Claude Code and Codex are covered; Muse after its qualification (§3.6).
+
+Until SH2+ is active, interim rails live outside this module: a per-identity watcher that holds the wait itself and injects one fixed line only into an idle session with an empty input line and never into one the operator stopped; and, for sessions in today's daemon, its notice path, which delivers only while a client is attached (§1.1).
 
 ## 4. Estimates
 
