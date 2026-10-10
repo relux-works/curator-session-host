@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -206,9 +207,16 @@ func TestConsumerRejectsDifferentSelectedVersion(t *testing.T) {
 	save(t, filepath.Join(proxy, "example.org/sh1-host/@v/"+newer+".mod"), mod)
 	save(t, filepath.Join(proxy, "example.org/sh1-host/@v/"+newer+".info"), []byte(`{"Version":"`+newer+`","Time":"2026-10-11T00:00:00Z"}`))
 	report := filepath.Join(dir, "report")
-	b, code, e := run(".", nil, tool, "consumer", "-candidate", cand, "-checkout", src, "-version", "v0.0.0-20261010000000-0123456789ab", "-proxy", proxy, "-report", report)
+	cmd := exec.Command(tool, "consumer", "-candidate", cand, "-checkout", src, "-version", "v0.0.0-20261010000000-0123456789ab", "-proxy", proxy, "-report", report)
+	b, e := cmd.CombinedOutput()
+	code := 0
+	if exit, ok := e.(*exec.ExitError); ok {
+		code = exit.ExitCode()
+	} else if e != nil {
+		t.Fatal(e)
+	}
 	t.Logf("different selected version CLI exit %d", code)
-	if e != nil || code != 1 || !bytes.Contains(b, []byte("effective candidate selection differs")) {
+	if code != 1 || !bytes.Contains(b, []byte("effective candidate selection differs")) {
 		t.Fatalf("wrong refusal: exit %d, %v, %s", code, e, b)
 	}
 	if _, e := os.Stat(report); !os.IsNotExist(e) {
