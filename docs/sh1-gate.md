@@ -160,7 +160,7 @@ fresh module cache, GOWORK off,
 only this file proxy, and the checksum server disabled for the local synthetic
 publication. Records command exit codes, the two candidate go.sum lines, the
 module graph, proxy file hashes and consumer file hashes. Selection from
-`go list -m -json` must equal the requested pseudo-version; a higher MVS minimum
+`go list -mod=mod -m -json all` must equal the requested pseudo-version; a higher MVS minimum
 refuses. Checksums must have exactly the candidate zip and `/go.mod` keys for
 that version and match `go mod download -json`. Historical and unrelated
 checksum lines are preserved and excluded from the candidate checksum pair.

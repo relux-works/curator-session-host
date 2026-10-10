@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -174,22 +175,37 @@ func consumer(root, checkout, version, proxy, report string) error {
 			}
 		}
 	}
-	selected, e := invoke("go", "list", "-m", "-json", m.New)
+	selected, e := invoke("go", "list", "-mod=mod", "-m", "-json", "all")
 	if e != nil {
 		return e
 	}
-	var selection struct {
-		Path    string
-		Version string
-		Replace json.RawMessage
+	// Listing one root module can use Go's lazy-loading shortcut and miss a
+	// transitive higher minimum. Expand the entire build list before attesting.
+	decoder := json.NewDecoder(bytes.NewReader(selected))
+	found := false
+	for {
+		var selection struct {
+			Path    string
+			Version string
+			Replace json.RawMessage
+		}
+		if e = decoder.Decode(&selection); e == io.EOF {
+			break
+		} else if e != nil {
+			return e
+		}
+		if selection.Path != m.New {
+			continue
+		}
+		if found || selection.Version != version || len(selection.Replace) != 0 {
+			return errors.New("effective candidate selection differs from requested pseudo-version")
+		}
+		found = true
+		r.SelectedVersion = selection.Version
 	}
-	if e = json.Unmarshal(selected, &selection); e != nil {
-		return e
+	if !found {
+		return errors.New("candidate absent from effective build list")
 	}
-	if selection.Path != m.New || selection.Version != version || len(selection.Replace) != 0 {
-		return errors.New("effective candidate selection differs from requested pseudo-version")
-	}
-	r.SelectedVersion = selection.Version
 	downloaded, e := invoke("go", "mod", "download", "-json", m.New)
 	if e != nil {
 		return e
