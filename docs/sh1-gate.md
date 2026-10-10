@@ -68,7 +68,7 @@ the output must be absent or empty. A supplied candidate module file is emitted
 as `go.mod`.
 
 `sh1-manifest.json` lists each output file, mode, original SHA-256, transformed
-SHA-256, and protected-file classification. The supplied go.mod has no original
+SHA-256, source go.mod digest, and protected-file classification. The supplied go.mod has no original
 package hash. The manifest cannot hash itself and is excluded from its own file
 list. The generator digest hashes sorted names and SHA-256s of its embedded Go
 sources (including tool tests). The transform digest binds that digest, package,
@@ -244,7 +244,9 @@ module graph and sanitized environment identities.
 | Run | Ubuntu job duration | macOS job duration | Result |
 | --- | --- | --- | --- |
 | [38015721398](https://github.com/relux-works/curator-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
+| [38015843173](https://github.com/relux-works/curator-session-host/actions/runs/38015843173), strengthened refusal tests | 31 s | 43 s | Both green |
 
 Durations are measured from the hosted jobs' started/completed timestamps,
-including setup and artifact upload. The initial snapshot passed on both
-platforms; changes made afterward require another hosted run before handoff.
+including setup and artifact upload. Both recorded snapshots passed every
+public matrix step. These measurements concern synthetic tooling only; private
+source/consumer gate durations remain unknown.
