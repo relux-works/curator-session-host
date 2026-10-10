@@ -233,7 +233,8 @@ private lane success.
 
 ## Public verification and durations
 
-The public matrix runs format, vet, race-enabled unit/refusal tests, build, and
+The public matrix runs format, vet, build, and the whole tool test package in
+one uncached race-enabled process, including unit/refusal tests and
 `TestFixtureEndToEnd`. That test launches the built CLI for every tool and repeats
 generation, projection, inventory, mutations and consumer preparation on equal
 inputs, requiring byte-identical trees and reports. It executes module and
