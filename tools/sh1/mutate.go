@@ -91,6 +91,12 @@ func mutate(checkout, listFile, report string, command []string) error {
 		return e
 	}
 	baseline, code, e := run(checkout, nil, command...)
+	// Keep the caller's complete stream, including a refused baseline. Raw
+	// output belongs in job logs, never in source-free report artifacts.
+	fmt.Fprintf(os.Stderr, "SH1 mutation baseline exit %d\n", code)
+	if _, outputErr := os.Stdout.Write(baseline); outputErr != nil {
+		return outputErr
+	}
 	if e != nil {
 		return e
 	}
@@ -123,6 +129,10 @@ func mutate(checkout, listFile, report string, command []string) error {
 		restoreErr := write(p, before, modes[m.File])
 		if restoreErr != nil {
 			return restoreErr
+		}
+		fmt.Fprintf(os.Stderr, "SH1 mutation %s exit %d\n", m.Name, exit)
+		if _, outputErr := os.Stdout.Write(output); outputErr != nil {
+			return outputErr
 		}
 		if runErr != nil {
 			return runErr

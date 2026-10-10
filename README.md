@@ -1,4 +1,4 @@
-# curator-session-host
+# swarma-session-host
 
 The session host keeps agent sessions running in the background: it starts a harness (Claude Code, Codex, Muse) in a given directory with a given goal, lets a person attach and detach, delivers messages into a running session, and reports what happens. Today this job is done by the session manager inside task-board (`tb-sessiond`). This repository is where it becomes its own module.
 
@@ -11,7 +11,7 @@ Related modules: [curator-dispatcher](https://github.com/relux-works/curator-dis
 
 The generic SH1 gate tools and invented fixture are documented in
 [`docs/sh1-gate.md`](docs/sh1-gate.md). Public CI exercises the tooling on
-GitHub-hosted macOS and Ubuntu; the actual extraction gates remain private.
+GitHub-hosted macOS and Ubuntu; lanes 1 and 2 also run here against a pinned checkout of the board. The gate records failures and never hides skips; see the evidence and declared constraints in the gate document.
 
 ## Provenance
 

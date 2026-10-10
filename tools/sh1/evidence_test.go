@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,49 @@ func encodeEvents(events []Event) []byte {
 		b.WriteByte('\n')
 	}
 	return b.Bytes()
+}
+
+func TestMutationRetainsRejectedBaselineAndMutantOutput(t *testing.T) {
+	pack := "example.org/sh1-fixture/internal/session"
+	for _, baselineFails := range []bool{true, false} {
+		t.Run(fmt.Sprintf("baselineFails=%t", baselineFails), func(t *testing.T) {
+			src := fixture(t)
+			dir := t.TempDir()
+			decl := filepath.Join(dir, "mutations.json")
+			report := filepath.Join(dir, "report.json")
+			list := MutationList{Version: 1, Mutations: []Mutation{{"identity", "internal/session/session.go", `identity == "member" || identity == "operator"`, `identity == "member"`, pack, "TestAdmission"}}}
+			if e := jsonWrite(decl, list); e != nil {
+				t.Fatal(e)
+			}
+			original, e := os.ReadFile(filepath.Join(src, "internal/session/session.go"))
+			if e != nil {
+				t.Fatal(e)
+			}
+			save(t, filepath.Join(src, "original"), original)
+			failed := encodeEvents([]Event{{Action: "run", Package: pack, Test: "TestAdmission"}, {Action: "output", Package: pack, Test: "TestAdmission", Output: "exact failure diagnostic\n"}, {Action: "fail", Package: pack, Test: "TestAdmission"}, {Action: "fail", Package: pack}})
+			passed := encodeEvents([]Event{{Action: "run", Package: pack, Test: "TestAdmission"}, {Action: "pass", Package: pack, Test: "TestAdmission"}, {Action: "pass", Package: pack}})
+			save(t, filepath.Join(src, "failed"), failed)
+			save(t, filepath.Join(src, "passed"), passed)
+			script := filepath.Join(dir, "command.sh")
+			body := "if cmp -s internal/session/session.go original; then cat passed; exit 0; else cat failed; exit 1; fi\n"
+			if baselineFails {
+				body = "cat failed\nexit 7\n"
+			}
+			save(t, script, []byte(body))
+			out, code, e := run(".", nil, tool, "mutate", "-checkout", src, "-mutations", decl, "-report", report, "--", "sh", script)
+			want, wantCode := append(append([]byte{}, passed...), failed...), 0
+			if baselineFails {
+				want, wantCode = failed, 1
+			}
+			if e != nil || code != wantCode || !bytes.Equal(out, want) {
+				t.Fatalf("CLI discarded failure stream: exit %d, error %v, output %s", code, e, out)
+			}
+			restored, e := os.ReadFile(filepath.Join(src, "internal/session/session.go"))
+			if e != nil || !bytes.Equal(restored, original) {
+				t.Fatal("mutated source not restored")
+			}
+		})
+	}
 }
 
 // Drive the real mutate CLI with the caller-command interface. The command
@@ -253,7 +297,7 @@ func TestLifecycleNarrowingMutant(t *testing.T) {
 		t.Fatalf("narrowing did not fail: exit %d, %v\n%s", code, e, output)
 	}
 	events, e := eventStream(output)
-	pack := "github.com/relux-works/curator-session-host/tools/sh1"
+	pack := "github.com/relux-works/swarma-session-host/tools/sh1"
 	if e != nil || !hasTest(events, pack, "TestMutationRejectsInvalidLifecycleEvidence", "fail") || !hasTest(events, pack, "", "fail") {
 		t.Fatalf("missing named regression failure: %v\n%s", e, output)
 	}
