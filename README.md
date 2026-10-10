@@ -9,6 +9,10 @@ The session host keeps agent sessions running in the background: it starts a har
 
 Related modules: [curator-dispatcher](https://github.com/relux-works/curator-dispatcher), [curator-host-helper](https://github.com/relux-works/curator-host-helper), [curator-credential-broker](https://github.com/relux-works/curator-credential-broker), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge).
 
+The generic SH1 gate tools and invented fixture are documented in
+[`docs/sh1-gate.md`](docs/sh1-gate.md). Public CI exercises the tooling on
+GitHub-hosted macOS and Ubuntu; the actual extraction gates remain private.
+
 ## Provenance
 
 Code moved here is a snapshot of task-board's `tools/board-cli/internal/sessionmanager` at a pinned commit of relux-works/skill-project-management (Apache-2.0), without that repository's history. Each move records the source commit. The NOTICE keeps the original attribution.
