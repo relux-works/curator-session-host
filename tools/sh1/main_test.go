@@ -345,3 +345,66 @@ func TestRewriteImportsOnly(t *testing.T) {
 		t.Fatal(string(got))
 	}
 }
+
+func TestAdapterAndManifestRefusals(t *testing.T) {
+	src, cand, _ := candidateFixture(t)
+	command(t, src, "git", "init", "-q")
+	command(t, src, "git", "add", ".")
+	command(t, src, "git", "-c", "user.name=SH1 Fixture", "-c", "user.email=fixture@example.org", "commit", "-qm", "Fixture")
+	oid := strings.TrimSpace(string(command(t, src, "git", "rev-parse", "HEAD")))
+	adapters := filepath.Join(t.TempDir(), "adapters.json")
+	args := []string{"project", "-candidate", cand, "-checkout", src, "-package", "internal/session", "-commit", oid, "-adapters", adapters, "-report", filepath.Join(t.TempDir(), "report")}
+	for _, data := range []string{`{"version":2,"entries":[]}`, `{"version":1}`, `{"version":1,"entries":[{"patch":"implicit"}]}`, `{"version":1,"entries":[],"unknown":true}`} {
+		save(t, adapters, []byte(data))
+		reject(t, args...)
+	}
+	save(t, adapters, []byte(`{"version":1,"entries":[]}`))
+	manifestPath := filepath.Join(cand, manifestName)
+	original, e := os.ReadFile(manifestPath)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var m Manifest
+	if e = readJSON(manifestPath, &m); e != nil {
+		t.Fatal(e)
+	}
+	m.Files[0].Path = "../outside"
+	if e = jsonWrite(manifestPath, m); e != nil {
+		t.Fatal(e)
+	}
+	reject(t, args...)
+	save(t, manifestPath, original)
+	save(t, filepath.Join(cand, "extra.txt"), []byte("undeclared"))
+	reject(t, args...)
+}
+func TestMutationOtherFailureDoesNotKillNamedTest(t *testing.T) {
+	src := fixture(t)
+	decl := filepath.Join(t.TempDir(), "mutations.json")
+	report := filepath.Join(t.TempDir(), "report.json")
+	list := MutationList{Version: 1, Mutations: []Mutation{{"wrong-test", "internal/session/session.go", `identity == "member" || identity == "operator"`, `true`, "example.org/sh1-fixture/internal/session", "TestGolden"}}}
+	if e := jsonWrite(decl, list); e != nil {
+		t.Fatal(e)
+	}
+	reject(t, "mutate", "-checkout", src, "-mutations", decl, "-report", report, "--", "go", "test", "-json", "-count=1", "./...")
+	var r MutationReport
+	if e := readJSON(report, &r); e != nil {
+		t.Fatal(e)
+	}
+	if r.Results[0].Exit == 0 || r.Results[0].Status != "survived" {
+		t.Fatal("unrelated failure counted as named kill", r)
+	}
+}
+func TestConsumerImmutableProxyCollision(t *testing.T) {
+	src, cand, _ := candidateFixture(t)
+	if e := os.RemoveAll(filepath.Join(src, "internal")); e != nil {
+		t.Fatal(e)
+	}
+	proxy := filepath.Join(t.TempDir(), "proxy")
+	version := "v0.0.0-20261010000000-0123456789ab"
+	save(t, filepath.Join(proxy, "example.org/sh1-host/@v/"+version+".zip"), []byte("conflicting bytes"))
+	reject(t, "consumer", "-candidate", cand, "-checkout", src, "-version", version, "-proxy", proxy, "-report", filepath.Join(t.TempDir(), "report"))
+	b, e := os.ReadFile(filepath.Join(proxy, "example.org/sh1-host/@v/"+version+".zip"))
+	if e != nil || string(b) != "conflicting bytes" {
+		t.Fatal("immutable proxy overwritten")
+	}
+}

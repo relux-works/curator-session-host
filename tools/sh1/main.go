@@ -42,6 +42,7 @@ type Manifest struct {
 	Generator string       `json:"generator"`
 	Transform string       `json:"transform"`
 	ModInput  string       `json:"mod_input"`
+	SourceMod string       `json:"source_mod"`
 	Files     []FileRecord `json:"files"`
 }
 
@@ -284,9 +285,12 @@ func generate(source, pkg, old, new, out, modFile string) error {
 	if e != nil {
 		return e
 	}
-	_, srcVersion, e := modIdentity(srcMod)
+	srcName, srcVersion, e := modIdentity(srcMod)
 	if e != nil {
 		return e
+	}
+	if srcName+"/"+pkg != old {
+		return errors.New("old import path does not match source module and package")
 	}
 	if srcVersion != version {
 		return errors.New("source and candidate Go versions differ")
@@ -295,7 +299,7 @@ func generate(source, pkg, old, new, out, modFile string) error {
 	if e != nil {
 		return e
 	}
-	m := Manifest{Version: 1, Old: old, New: new, Package: pkg, Generator: gen, ModInput: digest(mod), Files: []FileRecord{}}
+	m := Manifest{Version: 1, Old: old, New: new, Package: pkg, Generator: gen, ModInput: digest(mod), SourceMod: digest(srcMod), Files: []FileRecord{}}
 	params, _ := json.Marshal([]string{pkg, old, new, digest(srcMod), m.ModInput})
 	m.Transform = digest(append([]byte(gen+"\n"), params...))
 	output := map[string][]byte{}

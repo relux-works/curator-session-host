@@ -243,8 +243,8 @@ module graph and sanitized environment identities.
 
 | Run | Ubuntu job duration | macOS job duration | Result |
 | --- | --- | --- | --- |
-| Pending publication decision | Not measured | Not measured | Not run |
+| [38015721398](https://github.com/relux-works/curator-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
 
-No test, vet or build result is claimed until GitHub-hosted execution is
-published and observed. Job durations will be recorded from the hosted run's
-started/completed timestamps, including setup and artifact upload.
+Durations are measured from the hosted jobs' started/completed timestamps,
+including setup and artifact upload. The initial snapshot passed on both
+platforms; changes made afterward require another hosted run before handoff.
