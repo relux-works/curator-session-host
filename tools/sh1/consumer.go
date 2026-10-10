@@ -131,7 +131,7 @@ func consumer(root, checkout, version, proxy, report string) error {
 	if e != nil {
 		return e
 	}
-	r := ConsumerReport{1, m.New, version, digest(mb), []FileRecord{}, []FileRecord{}, []string{}, []string{}, []CommandResult{}}
+	r := ConsumerReport{1, m.New, version, digest(mb), []FileRecord{}, []FileRecord{}, []string{}, []string{}, []CommandResult{{Command: []string{"go", "mod", "edit", "-json"}, Exit: exit}}}
 	for _, p := range keys(payload) {
 		if e = immutableWrite(filepath.Join(base, p), payload[p]); e != nil {
 			return e

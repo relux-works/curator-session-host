@@ -155,6 +155,7 @@ func TestFixtureEndToEnd(t *testing.T) {
 	}
 	// The public fixture also exercises the optional lanes explicitly.
 	enabled, code, e := run(src, []string{"SH1_FIXTURE_OPT_IN=1"}, "go", "test", "-json", "-count=1", "-tags=sh1extra", "./...")
+	t.Logf("opt-in go test -json -count=1 -tags=sh1extra ./... exit %d", code)
 	if e != nil || code != 0 {
 		t.Fatalf("opt-in command exit %d: %v", code, e)
 	}
@@ -205,6 +206,7 @@ func TestFixtureEndToEnd(t *testing.T) {
 	env := []string{"GOPROXY=file://" + filepath.ToSlash(proxyAbs), "GOSUMDB=off", "GONOPROXY=none", "GOWORK=off"}
 	for _, args := range [][]string{{"go", "test", "-race", "-count=1", "./..."}, {"go", "build", "./..."}, {"go", "run", "./cmd/demo"}} {
 		b, code, e := run(c1, env, args...)
+		t.Logf("consumer command %v exit %d", args, code)
 		if e != nil || code != 0 {
 			t.Fatalf("consumer %v exit %d: %v %s", args, code, e, b)
 		}
@@ -407,4 +409,24 @@ func TestConsumerImmutableProxyCollision(t *testing.T) {
 	if e != nil || string(b) != "conflicting bytes" {
 		t.Fatal("immutable proxy overwritten")
 	}
+}
+
+func TestGenerateIdentityAndModuleRefusals(t *testing.T) {
+	src := fixture(t)
+	mod := filepath.Join(t.TempDir(), "go.mod")
+	for _, data := range []string{
+		"module example.org/sh1-host\n\ngo 1.25.5\nreplace example.org/dependency => ../local\n",
+		"module example.org/sh1-host\n\ngo 1.24.0\n",
+		"module example.org/sh1-host\n",
+	} {
+		save(t, mod, []byte(data))
+		reject(t, generateArgs(src, filepath.Join(t.TempDir(), "out"), mod)...)
+	}
+	save(t, mod, []byte("module example.org/sh1-host\n\ngo 1.25.5\n"))
+	args := generateArgs(src, filepath.Join(t.TempDir(), "out"), mod)
+	args[6] = "example.org/incorrect/internal/session"
+	reject(t, args...)
+	args = generateArgs(src, filepath.Join(t.TempDir(), "out"), mod)
+	args[4] = "../session"
+	reject(t, args...)
 }
