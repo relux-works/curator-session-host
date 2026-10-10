@@ -1,4 +1,4 @@
-# curator-session-host: specification
+# swarma-session-host: specification
 
 - **Status:** draft r4 (2026-10-10; §3.7 wake and liveness, §3.8 goals across accounts and the final names added the same day). Nothing has been moved yet.
 - **Normative language:** MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.

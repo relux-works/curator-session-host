@@ -253,7 +253,7 @@ func TestLifecycleNarrowingMutant(t *testing.T) {
 		t.Fatalf("narrowing did not fail: exit %d, %v\n%s", code, e, output)
 	}
 	events, e := eventStream(output)
-	pack := "github.com/relux-works/curator-session-host/tools/sh1"
+	pack := "github.com/relux-works/swarma-session-host/tools/sh1"
 	if e != nil || !hasTest(events, pack, "TestMutationRejectsInvalidLifecycleEvidence", "fail") || !hasTest(events, pack, "", "fail") {
 		t.Fatalf("missing named regression failure: %v\n%s", e, output)
 	}

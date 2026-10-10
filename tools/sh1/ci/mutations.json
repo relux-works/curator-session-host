@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "mutations": [
+    {
+      "name": "local-key-isolation",
+      "file": "internal/sessionmanager/key.go",
+      "anchor": "sum := sha256.Sum256([]byte(string(kind) + \"\\x00\" + canonical))",
+      "replacement": "sum := sha256.Sum256([]byte(string(kind)))",
+      "package": "github.com/aagrigore/task-board/internal/sessionmanager",
+      "test": "TestBoardKeysCanonicalizeAndIsolateBoards"
+    },
+    {
+      "name": "remote-default-port-normalization",
+      "file": "internal/sessionmanager/key.go",
+      "anchor": "if (scheme == \"http\" && port == \"80\") || (scheme == \"https\" && port == \"443\") {",
+      "replacement": "if scheme == \"http\" && port == \"80\" {",
+      "package": "github.com/aagrigore/task-board/internal/sessionmanager",
+      "test": "TestBoardKeysCanonicalizeAndIsolateBoards"
+    },
+    {
+      "name": "remote-board-identity",
+      "file": "internal/sessionmanager/key.go",
+      "anchor": "normalizedOrigin+\"\\x00\"+boardID",
+      "replacement": "normalizedOrigin+\"\\x00\"",
+      "package": "github.com/aagrigore/task-board/internal/sessionmanager",
+      "test": "TestBoardKeysCanonicalizeAndIsolateBoards"
+    }
+  ]
+}

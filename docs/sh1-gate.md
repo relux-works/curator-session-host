@@ -7,17 +7,26 @@ The recursive source snapshot and the actual three-lane proof remain later work.
 
 ## Lanes and ownership
 
+The owner decision of 2026-10-10 supersedes the original private workflow plan.
+`sh1-lanes.yml` runs on pushes to this public repository's own branches and on
+`workflow_dispatch` with `spm_ref` (default `main`). A hosted Ubuntu job resolves
+that ref once; all three matrix jobs check out the same exact board commit.
+No pull-request event can access the board token through this workflow.
+
 | Lane | Location | Input and gate |
 | --- | --- | --- |
-| 1: projection | Private source repository, fixed self-hosted runner label | Candidate production sources projected into a clean pinned checkout at the old import path; unchanged package tests, fixtures and goldens; inventory and named-test mutation kills. |
-| 2: consumer | Separate private workflow, GitHub-hosted Ubuntu | Candidate fetched through a file GOPROXY with a require and no candidate replace; complete consumer CI, converters, composition root and CLI behavior. Z and C1 use an immutable module tag. |
-| 3: module | Public repository, GitHub-hosted macOS and Ubuntu | Module vet, tests with race detection, build, and declared platform conformance. This initial workflow tests generic tooling and synthetic module/consumer behavior only. |
+| 1: projection | GitHub-hosted macOS and Ubuntu | Recursive candidate projected at the original import path; unchanged root and `musepty` tests, uncached and unmasked; inventories, guard ratios and named-test mutations. |
+| 2: consumer | GitHub-hosted Ubuntu | Candidate through the file GOPROXY, no candidate replace; `go build ./...` and `go vet ./...` for `tools/board-cli`. |
+| 3: tooling | GitHub-hosted macOS and Ubuntu | Generic tool vet, race tests, build and fixture; this does not establish extracted-module conformance. |
 
-The private repository never becomes public through this workflow. No public
-job fetches private sources, uses secrets, or selects a self-hosted runner.
-`sh1-tooling.yml` grants only `contents: read`, pins Actions, and disables persisted
-checkout credentials. GitHub owns both public runners. All validation runs there;
-no tests, builds or vet run on the development host.
+Every job grants only `contents: read`. Actions are pinned by commit SHA;
+checkout credentials are not persisted. `SPM_READ_TOKEN` is used only as the
+`token:` argument of a board checkout. The owner permits board code excerpts in
+public job logs. Lane artifacts upload only explicitly listed JSON manifests,
+inventories, projection/guard/mutation/consumer reports and timing summaries.
+They never upload board checkouts, candidate bytes, dependency caches, proxy
+archives or raw logs. Existing tooling artifacts contain the invented fixture
+only. All tests, builds and vet run on GitHub; none run on the development host.
 
 ## Commands
 
@@ -73,7 +82,7 @@ package hash. The manifest cannot hash itself and is excluded from its own file
 list. The generator digest hashes sorted names and SHA-256s of its embedded Go
 sources (including tool tests). The transform digest binds that digest, package,
 old and new imports, source go.mod digest and supplied module-file digest. Local
-absolute paths and timestamps are excluded. Later private evidence must bind the
+absolute paths and timestamps are excluded. Hosted evidence must bind the
 manifest hash to authenticated source/candidate identities; a self-authored
 manifest alone does not establish provenance.
 
@@ -144,7 +153,7 @@ survivors do not count as kills. Reports retain actual exit codes, before/after
 hashes, killed/survived/unknown statuses and a measured kill ratio. Any surviving
 or unknown mutation exits 1 after writing the report. The fixture proves both
 narrowing the admitted identity class and bypassing its gate, plus a by-name
-source guard. Later workflows declare converter and real guard mutations too.
+source guard. Later gates declare converter and additional real guard mutations too.
 Caller commands must emit Go test JSON on stdout; diagnostics belong on stderr.
 
 ### consumer
@@ -180,7 +189,7 @@ GOPROXY after this preparation step. The public end-to-end test does so.
 
 ## What F records
 
-The private gate's evidence bundle must include:
+The gate's evidence bundle must include:
 
 - Source commit, source go.mod and recursive source file hashes; candidate commit,
   host tree, candidate module file, candidate manifest and transform digest.
@@ -200,47 +209,74 @@ Artifacts live with the run and are attached to the Change Request before
 handoff. F remains provisional until the actual copy snapshot closes and all
 three lanes run on those pinned bytes.
 
-## Later private-workflow contract
+## Hosted lane contract
 
-Lane 1 is a distinct workflow inside the private source repository:
+The helper `tools/sh1/ci/run.py` builds the generic CLI on the runner and derives
+its Go toolchain from the board's `tools/board-cli/go.mod`. The reviewed prototype
+candidate retains that module's requirements, changes its module path to
+`github.com/relux-works/swarma-session-host`, and removes its two unrelated local
+board-library replacements. The empty version-1 projection adapter table is
+explicit. No tests, fixtures or goldens are patched.
 
-```yaml
-on:
-  push:
-    branches: ['session-host-f/**']
-permissions:
-  contents: read
-jobs:
-  projection:
-    runs-on: [self-hosted, sh1-projection]
+Lane 1 runs exactly:
+
+```sh
+go test -json -count=1 -timeout=12m ./internal/sessionmanager ./internal/sessionmanager/musepty
 ```
 
-There is no `workflow_dispatch`, pull-request event, runner input, or expression
-that can change the fixed `sh1-projection` label. The label is a runner class,
-not a machine name. No secrets are passed or read. The private Change Request
-must configure that fixed class with the runner owner; this public change does
-not create or configure a runner.
+The same full command supplies the mutation baseline and every mutant run.
+`mutations.json` declares local identity isolation, default-port normalization
+(narrowing HTTPS out of the admitted normalization class), and remote board
+identity. Each must fail `TestBoardKeysCanonicalizeAndIsolateBoards`. Baseline
+failures and compile errors do not count as kills. Full suite failures remain
+red even if a named mutant is killed. Inventories distinguish source declarations
+from dynamic subtests; inactive build-tagged tests remain visible. No runtime
+skip, failed test, unknown execution or untagged unobserved test is admitted.
+Tagged declarations are inventoried without enabling the board's opt-in tagged
+mutation suites. This starter list is bounded to identity behavior; converters,
+all real guard mutations and released-module conformance remain later gates.
 
-Check out exact reviewed source and candidate identities into disposable trees.
-Run the full package tests recursively (including the recursive provider
-subpackage) unchanged, uncached, without skips, and without `-run` masks. Supply
-the frozen opt-in environment and tags declared by the package owner. If an
-opt-in cannot be exercised without violating the runner's isolation, report that
-constraint and stop the gate; do not patch tests or turn a skip into green.
-Preserve fixtures and goldens, verify the projection report, publish inventories,
-require complete declared guard coverage, and require every declared mutation
-to kill its named test. Capture actual shell exits separately from inventories.
+The guard declaration derives the complete `claude*.go` production-file set used
+by `TestClaudeContextProductionHasNoFilesystemRemoval`, and also declares
+`hosted_takeover_guard.go` for
+`TestTheMutantInventoryCoversEveryPredicateOnTheRefusalPath`. Current unchanged
+board tests emit no `SH1_GUARD` read markers. A passing test alone therefore
+proves no reached target to this checker; the guard gate stays red. A proposed
+adapter is reviewed, test-attributed read instrumentation upstream in the board,
+with a new pinned source identity; no marker is synthesized from passing tests.
+The workflow records the measured reached/expected ratio, including this gap.
 
-Lane 2 is another workflow file in that private repository, on GitHub-hosted
-`ubuntu-latest`, with `contents: read` and no secrets. It consumes the identical
-candidate identity via a require and the proxy (later the immutable tag), with
-no candidate replace, then runs the entire existing consumer CI: configuration,
-board, vendor drift, build/document guards, all CLI packages, server and
-regression scenarios. Composition, converters and command behavior are real
-entry points. It may not replace the whole consumer suite with session subsets.
-Both lanes publish evidence keyed to the same source/candidate/transform tuple;
-changing any input invalidates the tuple. The public workflow cannot assert
-private lane success.
+Lane 2 mirrors the board's downloaded public dependencies into the file proxy
+and publishes the retained `pkg/board` and `pkg/remoteconfig` libraries from the
+same board commit at their already required `v0.0.0` versions. These are explicit
+prototype dependencies, with publication hashes recorded; they are neither
+neutral interfaces nor independently released libraries. The candidate has no
+replace. The consumer retains the board's two original unrelated replacements.
+The extracted package is removed from the disposable consumer, so tests needing
+board-internal access remain covered by lane 1. `consumer` rewrites imports,
+selects/downloads the candidate through a fresh cache and the file proxy, records
+both candidate go.sum lines and the module graph, and refuses a candidate
+replacement or wrong MVS selection. Build and vet then use a separate fresh
+cache, the same file proxy, and no network fallback. The pseudo-version is
+derived from the public snapshot commit's UTC timestamp and revision; it is not
+a released immutable tag. Whole-board CI and the released tag remain Z/C1 work.
+
+Missing qualified providers, Darwin sandbox or PTY restrictions, internal-only
+imports and source guards requiring private paths stay visible as failures or
+skips with exact test names. No provider stub, name mask, test deletion or
+implicit projection adapter is admitted. The full no-skip acceptance gate cannot
+turn green until the board owner supplies a hosted-compatible qualified input
+contract, including how intentional helper-process skips are handled. The
+current run is a development proof, not the Muse-cut freeze evidence.
+
+## Lane 1 and 2 evidence
+
+Hosted run evidence is recorded below after execution. Command summaries record
+actual exits and per-command durations; manifests bind recursive source/output
+hashes, generator digest, source module digest and transform digest. Inventory
+counts, every failed/skipped test, guard targets and named mutation outcomes are
+retained as reports. Job durations include checkout, setup and upload and are
+measured from the GitHub jobs API, separately from helper durations.
 
 ## Public verification and durations
 
@@ -264,12 +300,11 @@ kills and compile/unrelated-failure refusals remain in the same suite.
 
 | Run | Ubuntu job duration | macOS job duration | Result |
 | --- | --- | --- | --- |
-| [38015721398](https://github.com/relux-works/curator-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
-| [38015843173](https://github.com/relux-works/curator-session-host/actions/runs/38015843173), strengthened refusal tests | 31 s | 43 s | Both green |
-| [38016057110](https://github.com/relux-works/curator-session-host/actions/runs/38016057110), implementation and workflow verification | 43 s | 62 s | Both green |
-| [38019374197](https://github.com/relux-works/curator-session-host/actions/runs/38019374197), revision 2 regressions and narrowing proof | 42 s | 48 s | Both green |
+| [38015721398](https://github.com/relux-works/swarma-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
+| [38015843173](https://github.com/relux-works/swarma-session-host/actions/runs/38015843173), strengthened refusal tests | 31 s | 43 s | Both green |
+| [38016057110](https://github.com/relux-works/swarma-session-host/actions/runs/38016057110), implementation and workflow verification | 43 s | 62 s | Both green |
+| [38019374197](https://github.com/relux-works/swarma-session-host/actions/runs/38019374197), revision 2 regressions and narrowing proof | 42 s | 48 s | Both green |
 
 Durations are measured from the hosted jobs' started/completed timestamps,
 including setup and artifact upload. All recorded snapshots passed every
-public matrix step. These measurements concern synthetic tooling only; private
-source/consumer gate durations remain unknown.
+public matrix step. These measurements concern synthetic tooling only; source/consumer lane durations are recorded in the evidence section above.

@@ -28,6 +28,8 @@ jobs:
         with:
           go-version: '1.25.5'
           cache: false
+      - name: CI report admission regression tests
+        run: python3 -m unittest discover -s tools/sh1/ci -p 'test_*.py' -v
       - name: Format
         run: |
           gofmt -l tools/sh1 testdata/sh1-fixture > "$RUNNER_TEMP/sh1-format.txt"
