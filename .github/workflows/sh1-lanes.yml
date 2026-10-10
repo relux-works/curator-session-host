@@ -40,10 +40,15 @@ jobs:
         include:
           - lane: projection
             os: macos-latest
+            informative: false
           - lane: projection
             os: ubuntu-latest
+            informative: true
           - lane: consumer
             os: ubuntu-latest
+            informative: false
+    name: ${{ matrix.lane }} (${{ matrix.os }}, ${{ matrix.informative && 'informative' || 'gating' }})
+    continue-on-error: ${{ matrix.informative }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
@@ -81,6 +86,8 @@ jobs:
             ${{ runner.temp }}/sh1-reports/manifest.json
             ${{ runner.temp }}/sh1-reports/project.json
             ${{ runner.temp }}/sh1-reports/inventory.json
+            ${{ runner.temp }}/sh1-reports/baseline-inventory.json
+            ${{ runner.temp }}/sh1-reports/equivalence.json
             ${{ runner.temp }}/sh1-reports/guards.json
             ${{ runner.temp }}/sh1-reports/mutations.json
             ${{ runner.temp }}/sh1-reports/consumer.json

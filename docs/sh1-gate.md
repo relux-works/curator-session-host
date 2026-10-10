@@ -15,7 +15,7 @@ No pull-request event can access the board token through this workflow.
 
 | Lane | Location | Input and gate |
 | --- | --- | --- |
-| 1: projection | GitHub-hosted macOS and Ubuntu | Recursive candidate projected at the original import path; unchanged root and `musepty` tests, uncached and unmasked; inventories, guard ratios and named-test mutations. |
+| 1: projection | GitHub-hosted macOS and Ubuntu | Same-runner baseline and projection of unchanged root and `musepty` tests, uncached and unmasked; exact outcome equivalence gates macOS, Ubuntu is informative; inventories, guard ratios and macOS named-test mutations. |
 | 2: consumer | GitHub-hosted Ubuntu | Candidate through the file GOPROXY, no candidate replace; `go build ./...` and `go vet ./...` for `tools/board-cli`. |
 | 3: tooling | GitHub-hosted macOS and Ubuntu | Generic tool vet, race tests, build and fixture; this does not establish extracted-module conformance. |
 
@@ -135,7 +135,7 @@ must supply authenticated logs rather than forged event streams.
 Opt-in declarations are explicit; the tool does not pretend to infer all
 environment-sensitive behavior from syntax. The public fixture reports a
 normal opt-in skip, then separately exercises the opt-in and build-tagged tests.
-The lane-1 acceptance run must have no skips and no name masks.
+Lane 1 uses no name masks. The 2026-10-10 rework decision permits the board's intentional skips only when baseline and projection agree on the exact test and reason; missing or unknown outcomes refuse.
 
 ### mutate
 
@@ -155,6 +155,10 @@ or unknown mutation exits 1 after writing the report. The fixture proves both
 narrowing the admitted identity class and bypassing its gate, plus a by-name
 source guard. Later gates declare converter and additional real guard mutations too.
 Caller commands must emit Go test JSON on stdout; diagnostics belong on stderr.
+The CLI forwards every baseline and mutant stream to stdout, including refused
+baselines, and labels each stage and its actual exit on stderr. This stream is
+retained in public job logs, excluded from artifacts; it is not one inventory
+stream because each stage repeats executions.
 
 ### consumer
 
@@ -227,30 +231,46 @@ Lane 1 runs exactly:
 go test -json -count=1 -timeout=12m ./internal/sessionmanager ./internal/sessionmanager/musepty
 ```
 
-The same full command supplies the mutation baseline and every mutant run.
+In the same job and checkout, the helper first runs the full command against the
+unmodified board and records `baseline-inventory.json`; it then projects the
+candidate and runs that identical command, recording `inventory.json`.
+`equivalence.json` compares each `(package, test)` outcome in both directions,
+including dynamic subtests, skip reasons, declaration paths, tags, opt-in
+conditions and unobserved tagged declarations. Package outcomes and actual test
+command exits must also match. A changed outcome, missing test, changed skip
+reason, absent package, unknown reason or malformed/partial evidence is red.
+Counts alone do not prove equality. No tests, fixtures or goldens are patched.
+macOS is gating, matching the board's package CI; Ubuntu shows the same diff and
+actual command exits under job-level `continue-on-error`, explicitly informative.
+A Linux failure shared by baseline and projection is pre-existing for that
+board commit, not a projection regression.
+
+The same full command supplies the macOS mutation baseline and every mutant run.
 `mutations.json` declares local identity isolation, default-port normalization
 (narrowing HTTPS out of the admitted normalization class), and remote board
 identity. Each must fail `TestBoardKeysCanonicalizeAndIsolateBoards`. Baseline
-failures and compile errors do not count as kills. Full suite failures remain
-red even if a named mutant is killed. Inventory discovery is scoped to the two
-tested packages at their original module-relative paths, with unchanged test and
-fixture bytes copied into a separate inventory tree. Unrelated board CLI tests
-are outside this lane's stated bound. Inventories distinguish source declarations
-from dynamic subtests; inactive build-tagged tests remain visible. No runtime
-skip, failed test, unknown execution or untagged unobserved test is admitted.
-Tagged declarations are inventoried without enabling the board's opt-in tagged
-mutation suites. This starter list is bounded to identity behavior; converters,
-all real guard mutations and released-module conformance remain later gates.
+failures and compile errors do not count as kills. Inventory discovery is scoped
+to the two tested packages at their original module-relative paths, with unchanged
+test and fixture bytes copied into separate inventory trees. Unrelated board CLI
+tests are outside this lane's stated bound. Inactive tagged tests are inventoried
+without enabling opt-in mutation suites. Ubuntu does not run these mutations.
+This starter list is bounded to identity behavior; converter and other real guard
+mutations and released-module conformance remain later gates.
 
-The guard declaration derives the complete `claude*.go` production-file set used
-by `TestClaudeContextProductionHasNoFilesystemRemoval`, and also declares
-`hosted_takeover_guard.go` for
-`TestTheMutantInventoryCoversEveryPredicateOnTheRefusalPath`. Current unchanged
-board tests emit no `SH1_GUARD` read markers. A passing test alone therefore
-proves no reached target to this checker; the guard gate stays red. A proposed
-adapter is reviewed, test-attributed read instrumentation upstream in the board,
-with a new pinned source identity; no marker is synthesized from passing tests.
-The workflow records the measured reached/expected ratio, including this gap.
+Guard read coverage is **informative** until upstream emits markers. The current
+report is **0/10, not instrumented upstream**; the inventory CLI still exits 1
+for incomplete guard reads, and that real exit is recorded. Only a valid written
+inventory with incomplete guard coverage receives this classification; malformed
+or missing evidence refuses. No marker is synthesized from a passing test.
+
+Upstream request: instrument `TestClaudeContextProductionHasNoFilesystemRemoval`
+to call `t.Log("SH1_GUARD " + relativeFile)` immediately after successfully
+reading each of its nine `claude*.go` production targets. Instrument
+`TestTheMutantInventoryCoversEveryPredicateOnTheRefusalPath` to emit
+`SH1_GUARD hosted_takeover_guard.go` after that successful read. Emit only from
+those named tests, with no marker on read failure; pin the accepted upstream
+commit before making 10/10 guard reads gating. The exact nine file names are
+listed in the historical evidence below and in the generated guard report.
 
 Lane 2 mirrors the board's downloaded public dependencies into the file proxy
 and publishes the retained `pkg/board` and `pkg/remoteconfig` libraries from the
@@ -259,7 +279,12 @@ prototype dependencies, with publication hashes recorded; they are neither
 neutral interfaces nor independently released libraries. The candidate has no
 replace. The consumer retains the board's two original unrelated replacements.
 The extracted package is removed from the disposable consumer, so tests needing
-board-internal access remain covered by lane 1. `consumer` rewrites imports,
+board-internal access remain covered by lane 1. Those tests import the board's
+`internal/store`, `internal/remote`, `internal/testsupport` and tagged-test helpers;
+standalone extracted-module test conformance is not established here. A proposed
+future adapter is a reviewed board-owned test-support bridge after the source
+freeze; the current projection continues to run the original private paths with
+an empty adapter table. `consumer` rewrites imports,
 selects/downloads the candidate through a fresh cache and the file proxy, records
 both candidate go.sum lines and the module graph, and refuses a candidate
 replacement or wrong MVS selection. Build and vet then use a separate fresh
@@ -267,24 +292,184 @@ cache, the same file proxy, and no network fallback. The pseudo-version is
 derived from the public snapshot commit's UTC timestamp and revision; it is not
 a released immutable tag. Whole-board CI and the released tag remain Z/C1 work.
 
-Missing qualified providers, Darwin sandbox or PTY restrictions, internal-only
-imports and source guards requiring private paths stay visible as failures or
-skips with exact test names. No provider stub, name mask, test deletion or
-implicit projection adapter is admitted. The full no-skip acceptance gate cannot
-turn green until the board owner supplies a hosted-compatible qualified input
-contract, including how intentional helper-process skips are handled. The
-current run is a development proof, not the Muse-cut freeze evidence.
+Qualified-provider and helper-process skips remain visible with exact reasons;
+Darwin-only confinement exclusions on Linux remain informative. Internal-only
+imports and PTY limits stay visible through the baseline and projection streams
+and inventories. No provider stub, test deletion or implicit adapter is admitted.
+This development proof does not gate the separate Muse-cut freeze.
 
-## Lane 1 and 2 evidence
+## Baseline-equivalence rework evidence
 
-Hosted run evidence is recorded below after execution. Command summaries record
-actual exits and per-command durations; manifests bind recursive source/output
-hashes, generator digest, source module digest and transform digest. Inventory
-counts, every failed/skipped test, guard targets and named mutation outcomes are
-retained as reports. Job durations include checkout, setup and upload and are
-measured from the GitHub jobs API, separately from helper durations.
+The resolved 2026-10-10 gate decision supersedes the old strict no-skip and guard
+admission blocker packet below. Fresh hosted run identities and exact outcomes
+will be recorded here before review handoff. Historical runs are retained with
+their real failures and cancelled-job limits; they are not baseline-equivalence
+evidence.
+
+## Historical lane 1 and 2 evidence (superseded admission policy)
+
+Hosted verification uses board main at `f074339026d7bd410d753f8059c19e99404e4794`. The tested public
+snapshot is `569e0087de83d45a344a59c6446eeff602a20512` (tree `415ef2531002a3fae6be3222822ea30a3a92a814`); subsequent worktree changes
+only add evidence documentation. The generator and candidate bytes are equal
+across all three snapshots. The manifest has 290 files including the supplied
+module file, with 195 protected package files. Projection compares 94 production
+files and 1,355 protected files across board-cli: every before/after hash is equal.
+
+| Identity | SHA-256 |
+| --- | --- |
+| Generator | `b0f8c2d2af6fe914bab751734a30e417a8ac43ec9fb446ed5c000e280fcd4b38` |
+| Manifest | `cae78e6e843b57935164cc60e9bb9f92ab8875da91a69b98da07059be2cfe457` |
+| Transform | `59529bf2650cc15475236889fec8ce2d981b9240013ae8a2342c5edeeaae124a` |
+| Source go.mod | `b06d4da806e5337faf6f1485b13a6676e16fe60f3c1b4ab62758d64f7c832f60` |
+| Candidate go.mod | `7622e5ff5ec276bcf97f3554dd65d531838d266c1e71444f3d3ab4b29a3ab6d4` |
+
+The consumer selected `v0.0.0-20261010054135-569e0087de83` through the file proxy, with
+these candidate checksums (also in `consumer.json`):
+
+```text
+github.com/relux-works/swarma-session-host v0.0.0-20261010054135-569e0087de83 h1:4D342Kf+T2XZFL9SUWYyxKa70MAXgFdqBkQMOiM5nS0=
+github.com/relux-works/swarma-session-host v0.0.0-20261010054135-569e0087de83/go.mod h1:+/vQzHkzfzWcTK+Tiirk8mscTIpoOkr6eEc0K2yvpfk=
+```
+
+`consumer.json` records 60 sorted module-graph rows and every proxy and
+consumer file hash; its SHA-256 is `06ae39798e733efe4853ef0f2e797f6daeb65ba23ddd96a9e36ce02f321532a5`. No replacement of the candidate
+module is present. The board's two original, unrelated library replacements
+remain documented in the hosted lane contract; this is a prototype retained
+dependency graph, not dependency-exit or released-module proof.
+
+All command exits are in the task outcome `TASK-261010-3uprc3_hosted-reports.json` and run JSON artifacts. The tooling commands `python3 -m unittest discover -s tools/sh1/ci -p 'test_*.py' -v`, format checks, `go vet ./tools/sh1/...`, `go test -v -race -count=1 ./tools/sh1/...` and `go build ./tools/sh1/...` exit 0 on both platforms for snapshot 3; the helper suite has eight tests. Its malformed-event child intentionally exits 7, and the regression verifies that exit is retained. Consumer proxy preparation, `go build ./...` and `go vet ./...` exit 0 for all three snapshots. No test, build or vet command runs on the development host.
+
+| Run / snapshot | macOS projection | Ubuntu projection | Ubuntu consumer | Tooling Ubuntu / macOS |
+| --- | --- | --- | --- | --- |
+| [38027685088](https://github.com/relux-works/swarma-session-host/actions/runs/38027685088) / `545a4c6583be` | cancelled, 872 s | failure, 597 s | success, 85 s | [both pass](https://github.com/relux-works/swarma-session-host/actions/runs/38027685094), 32 s / 62 s |
+| [38027807183](https://github.com/relux-works/swarma-session-host/actions/runs/38027807183) / `f533a3ce1350` | cancelled, 753 s | failure, 571 s | success, 89 s | [both pass](https://github.com/relux-works/swarma-session-host/actions/runs/38027807133), 40 s / 49 s |
+| [38028369569](https://github.com/relux-works/swarma-session-host/actions/runs/38028369569) / `569e0087de83` | failure, 1689 s | failure, 610 s | success, 89 s | [both pass](https://github.com/relux-works/swarma-session-host/actions/runs/38028369582), 38 s / 42 s |
+
+The first two macOS jobs were cancelled because their inventory scope was
+superseded. Each full suite had exited 0 with 5,088 run events and 34 skips;
+`inventory` exited 1 (`duplicate declared test` in unrelated CLI packages).
+Their mutation command exits and kills are unknown because cancellation
+interrupted execution before its report. Partial manifests/projection reports
+and sanitized authenticated-job-log observations are retained. Ubuntu completed
+in both old runs: package tests exit 1, inventory exits 1 for that same scope
+refusal, and mutate exits 1 because its baseline exits 1. Failing baseline JSON
+is not retained by the current CLI; its exact failing test names are unknown and
+are not inferred from the preceding suite. No baseline failure counts as a kill.
+
+Snapshot 3 scopes inventory to both tested packages. On Ubuntu it records:
+1,350 discovered declarations, 3,731 dynamic subtests, 5,073 executions, 36 skips,
+7 failures, 60 tagged rows, 3 explicit opt-ins and 8 unobserved tagged declarations.
+The package command exits 1; inventory writes its report and exits 1 for guard
+coverage. Mutation baseline exits 1; zero of three declared mutations execute
+and their named-kill proof remains unknown. macOS records 1,350 discovered declarations, 3,742 dynamic subtests, 5,088
+executions, 34 skips, no ordinary test failures, 60 tagged rows, 3 explicit
+opt-ins and 4 unobserved tagged declarations. Its full package command exits 0,
+its inventory writes the report and exits 1 for guard coverage, and its mutation
+baseline exits 0. `mutate` exits 0 and proves **3/3 named kills**:
+
+| Mutation | Required failing test | Mutant command exit | Result |
+| --- | --- | --- | --- |
+| `local-key-isolation` | `TestBoardKeysCanonicalizeAndIsolateBoards` | 1 | killed |
+| `remote-default-port-normalization` | `TestBoardKeysCanonicalizeAndIsolateBoards` | 1 | killed |
+| `remote-board-identity` | `TestBoardKeysCanonicalizeAndIsolateBoards` | 1 | killed |
+
+Those mutant command exits are deliberate failures, not passing test commands.
+Both projection helper processes exit 1 because their strict admission gates
+reject the recorded skips and unproven guard coverage. The macOS helper takes
+1,609.289 s (the package command 335.825 s and mutate 1,264.421 s); the Ubuntu
+helper takes 568.706 s (package command 296.904 s and mutate refusal 265.009 s).
+The consumer helper takes 44.635 s. Full job durations above include setup and upload.
+
+| Report | macOS SHA-256 | Ubuntu SHA-256 |
+| --- | --- | --- |
+| `project.json` | `d759947dada8daa5aa3dd0d33854cae801307984671e9bfb4585dbfa123a96f7` | `d759947dada8daa5aa3dd0d33854cae801307984671e9bfb4585dbfa123a96f7` |
+| `inventory.json` | `e063f5bfe08ae7b2e9b800ce92efe151c41f729a79689c0634b299b3e31a7e62` | `edd0d4f4c9328d5ccec96cefece91bf38413eb89434c397c5330906a411f9589` |
+| `guards.json` | `f32bc0ed5a578ad0d26b215db19a07f62aeab06512641bc59d7923cacdd5e88c` | `f32bc0ed5a578ad0d26b215db19a07f62aeab06512641bc59d7923cacdd5e88c` |
+| `mutations.json` | `5d2413869aac5bab49a3542d36d7c12d8270bc6f4d2642d4c15d3ea1a4e29ec0` | `unknown: baseline refused before report` |
+
+Guard targets reached/expected on both platforms are **0/10**: **0/9** for
+`TestClaudeContextProductionHasNoFilesystemRemoval` (`claude_assay_schema.go`,
+`claude_context.go`, `claude_context_assay.go`, `claude_context_fork.go`,
+`claude_context_lease.go`, `claude_context_reclamation.go`, `claude_host.go`,
+`claude_output.go`, `claude_transcript.go`) and **0/1** for
+`TestTheMutantInventoryCoversEveryPredicateOnTheRefusalPath`
+(`hosted_takeover_guard.go`). No successful read markers are observed.
+
+Every ordinary suite failure on Ubuntu in the recorded runs is the parent
+`TestMuseR31StopReportsUnrequestedSignalDeath` and these six subtests:
+
+- `control_clean_exit`
+- `control_exit3`
+- `segv_after_stdin_eof`
+- `abrt_after_stdin_eof`
+- `term_after_stdin_eof`
+- `self_kill_after_stdin_eof`
+
+Each fails during fake Muse launch with `initialize Muse MSP session: MSP server
+exited: EOF`. The protected and production hashes prove the projected bytes
+are identical to board main. The wrapper launches a background child with stdin;
+a proposed platform adapter is upstream review of original stdin preservation
+across `/bin/sh` background launch on Linux. This is a diagnostic hypothesis,
+not an established root cause; no shell replacement or test patch is applied here.
+
+Under the original policy, the task was blocked and the gate was red. The original blocker packet requested qualified provider
+artifacts and trusted project inputs, a contract for intentional helper skips and
+Darwin-only confinement tests on Linux, and reviewed upstream guard read markers.
+The board owner must resolve the Muse fixture failure in an accepted upstream
+revision. The orchestrator subsequently resolved admission through baseline equivalence,
+informative Ubuntu and informative guard coverage, as specified above.
+These runs do not gate the Muse-cut freeze or released-module acceptance.
+
+The complete observed skip list below comes from the corrected Ubuntu inventory;
+macOS observes the same list except the two Darwin-confinement exclusions.
+All raw logs remain in GitHub; artifacts and board outcomes contain report
+metadata only. ZIP attachment to the board was refused (`resource_binary_refused`),
+so outcome evidence is stored as plain-text JSON instead.
+
+| Package | Skipped test | Observed reason |
+| --- | --- | --- |
+| root | `TestBuilderConfinementProviderLiveSmoke` | builder_confinement_live_smoke_test.go:25: set TASK_BOARD_BUILDER_CONFINEMENT_LIVE_SMOKE=1 to run real providers |
+| root | `TestBuilderToolIsolationAdversarialLiveSmoke` | builder_tool_isolation_live_smoke_test.go:97: set TASK_BOARD_BUILDER_ISOLATION_LIVE_SMOKE=1 to run real providers |
+| root | `TestClaudeAdoptionLiveSmoke` | claude_live_smoke_test.go:138: set TASK_BOARD_CLAUDE_LIVE_SMOKE=1 to run the live Claude adoption smoke test |
+| root | `TestClaudeContextAssayLiveSmoke` | claude_context_live_smoke_test.go:457: set TASK_BOARD_CLAUDE_CONTEXT_LIVE_SMOKE=1 to run the live Claude context smoke test |
+| root | `TestClaudeContextForkLiveSmoke` | claude_context_live_smoke_test.go:34: set TASK_BOARD_CLAUDE_CONTEXT_LIVE_SMOKE=1 to run the live Claude context smoke test |
+| root | `TestClaudeHostContextForkLiveSmoke` | claude_context_live_smoke_test.go:198: set TASK_BOARD_CLAUDE_CONTEXT_LIVE_SMOKE=1 to run the live Claude context smoke test |
+| root | `TestClaudeHostLaunchesBuilderProcessUnderReadConfinement` | claude_host_test.go:294: production builder confinement currently uses Darwin Seatbelt |
+| root | `TestClaudeHostLiveSmoke` | claude_live_smoke_test.go:30: set TASK_BOARD_CLAUDE_LIVE_SMOKE=1 to run the live Claude smoke test |
+| root | `TestCodexAdoptionLiveSmoke` | codex_adoption_live_smoke_test.go:22: set TASK_BOARD_CODEX_ADOPTION_LIVE_SMOKE=1 to run the real Codex thread-adoption smoke |
+| root | `TestCodexBuilderConfigurationIsAcceptedByRealCodex` | builder_tool_isolation_live_smoke_test.go:576: set TASK_BOARD_BUILDER_ISOLATION_LIVE_SMOKE=1 to ask the installed Codex to parse |
+| root | `TestCodexContextForkLiveSmoke` | codex_context_live_smoke_test.go:22: set TASK_BOARD_CODEX_CONTEXT_LIVE_SMOKE=1 to run the real app-server thread/fork smoke |
+| root | `TestCodexEntrypointParityLiveSmoke` | codex_entrypoint_parity_live_smoke_test.go:74: set TASK_BOARD_CODEX_ENTRYPOINT_PARITY_LIVE_SMOKE=1 to run the real two-entry-point parity smoke |
+| root | `TestCodexExternalHomeAdoptionLiveSmoke` | codex_adoption_live_smoke_test.go:26: set TASK_BOARD_CODEX_ADOPTION_LIVE_SMOKE=1 to run the real Codex thread-adoption smoke |
+| root | `TestCodexHostLaunchesBuilderProcessUnderReadConfinement` | codex_host_test.go:1487: production builder confinement currently uses Darwin Seatbelt |
+| root | `TestCodexSpawnedOwnerLiveSmoke` | codex_host_test.go:1701: set TASK_BOARD_LIVE_CODEX=1 to run the real managed spawned-owner smoke |
+| root | `TestCodexTrustAppServerHelper` | codex_host_test.go:1380: helper process |
+| root | `TestMuseApplyImmediatelyAfterPreviousRevisionUsesSet` | muse_host_test.go:2195: set TASK_BOARD_MUSE_SMOKE_BIN to the copied Muse 1.4.1-R4503.1 binary to run the immediate-revision smoke |
+| root | `TestMuseMSPSmoke` | msp_smoke_test.go:179: set TASK_BOARD_MUSE_SMOKE_BIN to a copied qualified Muse binary (1.4.1-R4503.1 or 1.4.2-R4684.1) to run the offline smoke |
+| root | `TestMusePinnedSchemaExport` | muse_strict_decode_test.go:420: consumed closure: 28 definitions; muse_strict_decode_test.go:424: TASK_BOARD_MUSE_SMOKE_BIN is absent; byte-equality with a fresh export is unrun |
+| root | `TestMuseProviderHostEchoSmoke` | muse_host_test.go:2300: set TASK_BOARD_MUSE_SMOKE_BIN to the copied Muse 1.4.1-R4503.1 binary to run the offline echo smoke |
+| root | `TestMuseR23RealModelApprovalCapture` | muse_revision23_test.go:1007: set TASK_BOARD_MUSE_SMOKE_BIN to the copied Muse 1.4.1-R4503.1 binary to run the N3 capture |
+| root | `TestMuseRealBinaryDowngradedResumeFailsClosed` | muse_restore_history_test.go:857: set TASK_BOARD_MUSE_SMOKE_BIN to run this real-binary Muse 1.4.1 proxy sweep |
+| root | `TestMuseRealBinaryReplayAfterCancelledApplyUsesSameCommandID` | muse_revision08_test.go:705: set TASK_BOARD_MUSE_SMOKE_BIN to run this real-binary Muse 1.4.1 proxy sweep |
+| root | `TestMuseRealBinaryResumeDowngradeAndRev6StaleLifecycle` | muse_revision08_test.go:745: set TASK_BOARD_MUSE_SMOKE_BIN to run this real-binary Muse 1.4.1 proxy sweep |
+| root | `TestMuseRealBinaryResumeFoldsServedChildSpend` | muse_restore_history_test.go:800: set TASK_BOARD_MUSE_SMOKE_BIN to run this real-binary Muse 1.4.1 proxy sweep |
+| root | `TestMuseRealProviderBudgetPause` | muse_real_provider_test.go:74: real-provider test is disabled in CI |
+| root | `TestMuseTextEchoSmoke` | muse_text_goals_test.go:306: pinned echo binary not supplied |
+| /musepty | `TestMusePTYR10RealLongIdleTranscriptDelivers` | muse_pty_r10_screen_test.go:188: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYR14RealQuotedChromeTranscriptDelivers` | muse_pty_r14_regression_test.go:136: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYR15RealLongQuotedHeaderDelivers` | muse_pty_r15_regression_test.go:118: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYR15RealScrolledQuotedHeaderDelivers` | muse_pty_r15_regression_test.go:140: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYReal141EchoSmoke` | muse_pty_smoke_test.go:18: TASK_BOARD_MUSE_SMOKE_BIN not provided; real 1.4.1 smoke unrun |
+| /musepty | `TestMusePTYRealCompletedTranscriptAndLiteralFollowup` | muse_pty_regression_test.go:364: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYRealLiteralRuleRoundTrip` | muse_pty_grammar_test.go:267: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYRealPermissionsModalNeverPastes` | muse_pty_regression_test.go:417: pinned Echo binary not supplied; real regression unrun |
+| /musepty | `TestMusePTYRealQueueDrainRestoresNotice` | muse_pty_regression_test.go:383: pinned Echo binary not supplied; real regression unrun |
 
 ## Public verification and durations
+
+The four historical part-1 runs below are retained from the already attached
+evidence; this worker did not rerun those identities. This worker triggered and
+collected all three new tooling and lane workflows recorded above.
 
 The public matrix runs format, vet, build, and the whole tool test package in
 one uncached race-enabled process, including unit/refusal tests and

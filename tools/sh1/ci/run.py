@@ -14,7 +14,8 @@ PACKAGE = "github.com/aagrigore/task-board/internal/sessionmanager"
 TEST_COMMAND = ["go", "test", "-json", "-count=1", "-timeout=12m",
                 "./internal/sessionmanager", "./internal/sessionmanager/musepty"]
 REPORTS = {"summary.json", "manifest.json", "project.json", "inventory.json",
-           "guards.json", "mutations.json", "consumer.json"}
+           "baseline-inventory.json", "equivalence.json", "guards.json",
+           "mutations.json", "consumer.json"}
 
 
 def sha(path):
@@ -25,27 +26,47 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
 
 
-def admit_inventory(inventory):
-    """The measured runtime set cannot launder a skip or an absent package."""
+def outcome_set(inventory):
+    """Refuse unknown evidence; intentional skips and tagged absence are outcomes."""
     packages = {p["package"]: p for p in inventory["packages"]}
-    violations = []
+    if len(packages) != len(inventory["packages"]):
+        raise ValueError("duplicate inventory package")
+    if set(packages) != {PACKAGE, PACKAGE + "/musepty"}:
+        raise ValueError("inventory must contain exactly both tested packages")
+    outcomes = {}
     for name in (PACKAGE, PACKAGE + "/musepty"):
-        row = packages.get(name)
-        if row is None or row["status"] != "pass":
-            violations.append({"package": name, "status": "package_not_passed"})
-            continue
+        row = packages[name]
+        if row["status"] not in ("pass", "fail"):
+            raise ValueError("package outcome is unknown: " + name)
+        outcomes[(name, "")] = {"status": row["status"]}
         tests = row["tests"]
         if not tests or not any(t.get("executed") for t in tests):
-            violations.append({"package": name, "status": "no_tests_executed"})
+            raise ValueError("no tests executed: " + name)
         for test in tests:
-            # Inactive build-tagged declarations remain visible, with tags.
-            if test["status"] == "not_observed" and test.get("tags"):
-                continue
-            if test["status"] != "pass" or not test.get("executed"):
-                violations.append({"package": name, "test": test["name"],
-                                   "status": test["status"],
-                                   "reason": test.get("reason", "unknown")})
-    return violations
+            status = test["status"]
+            tagged_absence = status == "not_observed" and test.get("tags") and not test.get("executed")
+            if not tagged_absence and (status not in ("pass", "fail", "skip") or not test.get("executed")):
+                raise ValueError("unknown test outcome: " + name + "/" + test["name"])
+            if status == "skip" and test.get("reason", "unknown") in ("", "unknown"):
+                raise ValueError("skip reason is unknown: " + name + "/" + test["name"])
+            key = (name, test["name"])
+            if key in outcomes:
+                raise ValueError("duplicate test outcome: " + name + "/" + test["name"])
+            outcomes[key] = {field: test.get(field, "") for field in
+                             ("status", "executed", "file", "tags", "opt_in")}
+            if status == "skip":
+                outcomes[key]["reason"] = test["reason"]
+    return outcomes
+
+
+def compare_inventories(baseline, projection, baseline_exit, projection_exit):
+    before, after = outcome_set(baseline), outcome_set(projection)
+    differences = [{"package": key[0], "test": key[1], "baseline": before.get(key),
+                    "projection": after.get(key)}
+                   for key in sorted(before.keys() | after.keys()) if before.get(key) != after.get(key)]
+    return {"version": 1, "equivalent": not differences and baseline_exit == projection_exit,
+            "baseline_exit": baseline_exit, "projection_exit": projection_exit,
+            "outcomes_compared": len(before), "differences": differences}
 
 
 def counts(inventory):
@@ -103,7 +124,8 @@ class Lane:
                         "commands": [], "failures": [], "run_id": os.environ["GITHUB_RUN_ID"],
                         "run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
                         "runner_os": os.environ["RUNNER_OS"], "build_tags": [],
-                        "opt_in_environment": {}, "adapters": "empty version-1 table"}
+                        "opt_in_environment": {}, "adapters": "empty version-1 table",
+                        "gating": os.environ["SH1_LANE"] != "projection" or os.environ["RUNNER_OS"] == "macOS"}
         self.started = time.monotonic()
 
     def command(self, args, cwd=None, env=None, required=True, events=None):
@@ -126,7 +148,7 @@ class Lane:
                 ev = json.loads(line)
                 if ev.get("Action") in ("fail", "skip"):
                     failures.append({k: ev[k] for k in ("Action", "Package", "Test") if k in ev})
-            self.summary["test_terminals"] = failures
+            self.summary.setdefault("test_terminals", {})[events.stem] = failures
         else:
             print(self.safe(out), end="")
         print(self.safe(err), end="", file=sys.stderr)
@@ -172,10 +194,6 @@ class Lane:
                              "candidate_go_mod_hash": sha(mod)})
 
     def projection(self):
-        self.command([self.tool, "project", "-candidate", self.candidate,
-                      "-checkout", self.checkout, "-package", "internal/sessionmanager",
-                      "-commit", self.summary["board_commit"], "-adapters",
-                      self.host / "tools/sh1/ci/adapters.json", "-report", self.reports / "project.json"])
         # The guard expectation is derived from the unchanged guard's source scope.
         targets = sorted(p.name for p in (self.checkout / "internal/sessionmanager").glob("claude*.go")
                          if not p.name.endswith("_test.go"))
@@ -193,24 +211,25 @@ class Lane:
         guards = self.temp / "guard-declaration.json"
         write(guards, declaration)
         self.summary["guard_declaration_hash"] = sha(guards)
-        events = self.temp / "tests.jsonl"
-        self.command(TEST_COMMAND, self.checkout, required=False, events=events)
-        source = inventory_source(self.checkout, self.temp / "inventory-source")
-        result = self.command([self.tool, "inventory", "-source", source,
-                               "-events", events, "-guards", guards,
-                               "-report", self.reports / "inventory.json"], required=False)
-        if result.returncode:
-            self.summary["failures"].append({"gate": "inventory/guard coverage", "exit": result.returncode})
-        if (self.reports / "inventory.json").exists():
-            inventory = json.loads((self.reports / "inventory.json").read_text())
-            write(self.reports / "guards.json", {"guard_ratio": inventory["guard_ratio"],
-                                               "guards": inventory["guards"],
-                                               "bound": "unchanged tests emit no SH1_GUARD read markers; reached is unproven"})
-            self.summary["inventory_counts"] = counts(inventory)
-            self.summary["guard_ratio"] = inventory["guard_ratio"]
-            self.summary["failures"].extend(admit_inventory(inventory))
-        else:
-            self.summary["failures"].append({"gate": "inventory unavailable", "status": "unknown"})
+        baseline, baseline_exit = self.test_inventory("baseline", guards, "baseline-inventory.json")
+        self.command([self.tool, "project", "-candidate", self.candidate,
+                      "-checkout", self.checkout, "-package", "internal/sessionmanager",
+                      "-commit", self.summary["board_commit"], "-adapters",
+                      self.host / "tools/sh1/ci/adapters.json", "-report", self.reports / "project.json"])
+        inventory, projection_exit = self.test_inventory("projection", guards, "inventory.json")
+        diff = compare_inventories(baseline, inventory, baseline_exit, projection_exit)
+        write(self.reports / "equivalence.json", diff)
+        self.summary["equivalence"] = diff
+        if not diff["equivalent"]:
+            self.summary["failures"].append({"gate": "baseline equivalence", "differences": diff["differences"],
+                                             "baseline_exit": baseline_exit, "projection_exit": projection_exit})
+        write(self.reports / "guards.json", {"guard_ratio": inventory["guard_ratio"],
+                                           "guards": inventory["guards"], "gating": False,
+                                           "bound": "not instrumented upstream"})
+        self.summary["guard_ratio"] = inventory["guard_ratio"]
+        if self.summary["runner_os"] != "macOS":
+            self.summary["mutations"] = "not run: mutations gate on macOS only"
+            return
         result = self.command([self.tool, "mutate", "-checkout", self.checkout,
                                "-mutations", self.host / "tools/sh1/ci/mutations.json",
                                "-report", self.reports / "mutations.json", "--"] + TEST_COMMAND, required=False)
@@ -218,6 +237,26 @@ class Lane:
             self.summary["failures"].append({"gate": "mutations", "exit": result.returncode, "status": "unproven unless report records kills"})
         if (self.reports / "mutations.json").exists():
             self.summary["mutation_ratio"] = json.loads((self.reports / "mutations.json").read_text())["kill_ratio"]
+
+    def test_inventory(self, label, guards, report_name):
+        events = self.temp / (label + ".jsonl")
+        result = self.command(TEST_COMMAND, self.checkout, required=False, events=events)
+        source = inventory_source(self.checkout, self.temp / (label + "-inventory-source"))
+        report = self.reports / report_name
+        measured = self.command([self.tool, "inventory", "-source", source,
+                                 "-events", events, "-guards", guards, "-report", report], required=False)
+        # The CLI writes a validated inventory before its guard-coverage refusal.
+        # Missing/malformed evidence never becomes an informative coverage gap.
+        inventory = json.loads(report.read_text())
+        outcome_set(inventory)
+        if measured.returncode not in (0, 1) or (measured.returncode == 1 and all(
+                g["reached"] == g["expected"] for g in inventory["guards"])):
+            raise RuntimeError("inventory refused beyond informative guard coverage")
+        self.summary[label + "_inventory_counts"] = counts(inventory)
+        self.summary[label + "_failed_tests"] = [
+            {"package": p["package"], "test": t["name"]}
+            for p in inventory["packages"] for t in p["tests"] if t["status"] == "fail"]
+        return inventory, result.returncode
 
     def consumer(self):
         # Stage all upstream dependency bytes first, then forbid network fallback.
