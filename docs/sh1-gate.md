@@ -97,14 +97,19 @@ adapters require a reviewed versioned implementation, not implicit patches.
 AST discovery covers named top-level Go Test declarations in all `_test.go`
 files, including inactive build-tagged files. Package rows list discovered
 source tests and observed dynamic subtests, build-tag expressions, opt-in
-conditions, execution flags, terminal results and skip reasons. Excluded tests
+conditions, execution flags, terminal results and skip reasons. Every skipped
+test has a reason; absent or diagnostic-only output is recorded as `unknown`,
+including streams without any test output events. Excluded tests
 are `not_observed`; this does not infer that they passed or why they were absent.
 Go list output is unnecessary for this fixture because source discovery also
 sees inactive files. This interface inventories tests, not benchmarks, fuzz
 corpus cases, or external packages whose source is outside the checkout.
 
 The input is one uncached `go test -json -count=1` stream, with terminal package
-and started-test events. Missing, empty, malformed, repeated, partial or
+and started-test events. A shared parser validates package/test lifecycles for
+both inventory and mutate: one run and exactly one terminal per observed test;
+no duplicate or conflicting terminals or unfinished tests at package termination.
+Missing, empty, malformed, repeated, partial or
 unsupported events refuse. A failed test is recorded as failed; inventory is not
 a substitute for checking the original go test exit code. Build failures whose
 new event actions are unsupported refuse rather than report absence.
@@ -131,8 +136,9 @@ a baseline and requires exit 0 and every named test passing in JSON evidence.
 Each mutation is applied independently, the identical command is run, and the
 file is restored before the next mutation or any reported command error.
 
-A kill requires a nonzero command exit and failure events for the named test
-and its package. Compile failures, malformed logs, another test failing, and
+A kill requires a nonzero command exit, exactly one completed named test
+execution with a failure terminal, and its package failure. Baseline admission
+requires exactly one completed passing execution of every named test. Compile failures, malformed logs, another test failing, and
 survivors do not count as kills. Reports retain actual exit codes, before/after
 hashes, killed/survived/unknown statuses and a measured kill ratio. Any surviving
 or unknown mutation exits 1 after writing the report. The fixture proves both
@@ -149,10 +155,16 @@ its Go files. It never adds a replace and refuses an existing replacement of
 the candidate module. Existing unrelated replacements remain caller-owned.
 Conflicting bytes at a published proxy version are refused.
 
-Runs download and module graph commands with a fresh module cache, GOWORK off,
+Runs effective module selection, download and module graph commands with a
+fresh module cache, GOWORK off,
 only this file proxy, and the checksum server disabled for the local synthetic
 publication. Records command exit codes, the two candidate go.sum lines, the
-module graph, proxy file hashes and consumer file hashes. A v0 pseudo-version
+module graph, proxy file hashes and consumer file hashes. Selection from
+`go list -m -json` must equal the requested pseudo-version; a higher MVS minimum
+refuses. Checksums must have exactly the candidate zip and `/go.mod` keys for
+that version and match `go mod download -json`. Historical and unrelated
+checksum lines are preserved and excluded from the candidate checksum pair.
+A v0 pseudo-version
 labels a disposable candidate; the synthetic timestamp/revision in the example
 is not an attestation of a real release. Private workflows derive those values
 from the pinned candidate commit. Later release gates use immutable tags and
@@ -241,6 +253,15 @@ inputs, requiring byte-identical trees and reports. It executes module and
 consumer tests, opt-in/tagged fixture tests, a consumer build and the cmd entry
 point. Artifacts include candidate bytes, proxy bytes, reports, inventories,
 module graph and sanitized environment identities.
+
+Revision 2 adds `TestMutationRejectsInvalidLifecycleEvidence`, which drives both
+CLI entry points with terminal-only baseline/mutant streams, conflicting or
+duplicate terminals, duplicate runs and unfinished named/other executions.
+`TestLifecycleNarrowingMutant` narrows production enforcement to source guards
+and requires that named CLI regression to fail (exit 1, named test and package
+failure), recording a 1/1 kill ratio. The ordinary suite remains unmasked; only
+the deliberate narrowing experiment uses a named regression mask. Real fixture
+kills and compile/unrelated-failure refusals remain in the same suite.
 
 | Run | Ubuntu job duration | macOS job duration | Result |
 | --- | --- | --- | --- |

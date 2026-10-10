@@ -77,6 +77,9 @@ func eventStream(b []byte) ([]Event, error) {
 	events := []Event{}
 	terminal := map[string]bool{}
 	seen := map[string]bool{}
+	runs := map[TestRef]bool{}
+	end := map[TestRef]string{}
+	failed := map[string]bool{}
 	for {
 		var ev Event
 		e := d.Decode(&ev)
@@ -98,7 +101,41 @@ func eventStream(b []byte) ([]Event, error) {
 			return nil, errors.New("event after package terminal")
 		}
 		seen[ev.Package] = true
+		if ev.Test != "" {
+			ref := TestRef{ev.Package, ev.Test}
+			switch ev.Action {
+			case "run":
+				if runs[ref] {
+					return nil, errors.New("duplicate test execution; use count=1")
+				}
+				runs[ref] = true
+			case "pass", "fail", "skip":
+				if !runs[ref] || end[ref] != "" {
+					return nil, errors.New("test terminal without unique execution")
+				}
+				end[ref] = ev.Action
+				if ev.Action == "fail" {
+					failed[ev.Package] = true
+				}
+			case "pause", "cont", "bench":
+				if !runs[ref] || end[ref] != "" {
+					return nil, errors.New("test activity outside execution")
+				}
+			case "output":
+				// Go may emit diagnostic output outside a test execution.
+			default:
+				return nil, errors.New("package action attributed to test")
+			}
+		}
 		if ev.Test == "" && (ev.Action == "pass" || ev.Action == "fail" || ev.Action == "skip") {
+			for ref := range runs {
+				if ref.Package == ev.Package && end[ref] == "" {
+					return nil, errors.New("incomplete test execution before package terminal")
+				}
+			}
+			if failed[ev.Package] && ev.Action != "fail" {
+				return nil, errors.New("failed test without package failure")
+			}
 			terminal[ev.Package] = true
 		}
 		events = append(events, ev)
@@ -191,7 +228,6 @@ func inventory(source, eventFile, guardFile, report string) error {
 	}
 	reached := map[TestRef]map[string]bool{}
 	outputs := map[TestRef]string{}
-	runs := map[TestRef]bool{}
 	end := map[TestRef]string{}
 	b, e := os.ReadFile(eventFile)
 	if e != nil {
@@ -225,16 +261,9 @@ func inventory(source, eventFile, guardFile, report string) error {
 		}
 		switch ev.Action {
 		case "run":
-			if runs[ref] {
-				return errors.New("duplicate test execution; use count=1")
-			}
-			runs[ref] = true
 			r.Executed = true
 			r.Status = "running"
 		case "pass", "fail", "skip":
-			if !runs[ref] || end[ref] != "" {
-				return errors.New("test terminal without unique execution")
-			}
 			end[ref] = ev.Action
 			r.Status = ev.Action
 		case "output":
@@ -252,24 +281,20 @@ func inventory(source, eventFile, guardFile, report string) error {
 			}
 		}
 	}
-	for ref := range runs {
-		if end[ref] == "" {
-			return errors.New("incomplete test execution")
+	for ref, status := range end {
+		if status != "skip" {
+			continue
 		}
-	}
-	for ref, output := range outputs {
-		if end[ref] == "skip" {
-			reason := []string{}
-			for _, line := range strings.Split(output, "\n") {
-				line = strings.TrimSpace(line)
-				if line != "" && !strings.HasPrefix(line, "===") && !strings.HasPrefix(line, "---") {
-					reason = append(reason, line)
-				}
+		reason := []string{}
+		for _, line := range strings.Split(outputs[ref], "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "===") && !strings.HasPrefix(line, "---") {
+				reason = append(reason, line)
 			}
-			packages[ref.Package][ref.Test].Reason = strings.Join(reason, "\n")
-			if len(reason) == 0 {
-				return errors.New("skip without reason")
-			}
+		}
+		packages[ref.Package][ref.Test].Reason = strings.Join(reason, "\n")
+		if len(reason) == 0 {
+			packages[ref.Package][ref.Test].Reason = "unknown"
 		}
 	}
 	gb, e := os.ReadFile(guardFile)

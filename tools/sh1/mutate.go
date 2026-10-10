@@ -40,6 +40,7 @@ type MutationReport struct {
 	Ratio        string           `json:"kill_ratio"`
 }
 
+// eventStream validates a unique completed execution before this lookup.
 func hasTest(events []Event, pack, test, status string) bool {
 	for _, ev := range events {
 		if ev.Package == pack && ev.Test == test && ev.Action == status {
@@ -95,7 +96,7 @@ func mutate(checkout, listFile, report string, command []string) error {
 	}
 	events, e := eventStream(baseline)
 	if e != nil {
-		return e
+		return fmt.Errorf("baseline evidence: %w", e)
 	}
 	if code != 0 {
 		return fmt.Errorf("baseline failed with exit %d", code)

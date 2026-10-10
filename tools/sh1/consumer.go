@@ -16,15 +16,16 @@ import (
 )
 
 type ConsumerReport struct {
-	Version       int             `json:"version"`
-	Module        string          `json:"module"`
-	PseudoVersion string          `json:"pseudo_version"`
-	Candidate     string          `json:"candidate"`
-	Proxy         []FileRecord    `json:"proxy"`
-	Consumer      []FileRecord    `json:"consumer"`
-	Sum           []string        `json:"go_sum"`
-	Graph         []string        `json:"module_graph"`
-	Commands      []CommandResult `json:"commands"`
+	Version         int             `json:"version"`
+	Module          string          `json:"module"`
+	PseudoVersion   string          `json:"pseudo_version"`
+	SelectedVersion string          `json:"selected_version"`
+	Candidate       string          `json:"candidate"`
+	Proxy           []FileRecord    `json:"proxy"`
+	Consumer        []FileRecord    `json:"consumer"`
+	Sum             []string        `json:"go_sum"`
+	Graph           []string        `json:"module_graph"`
+	Commands        []CommandResult `json:"commands"`
 }
 type CommandResult struct {
 	Command []string `json:"command"`
@@ -131,7 +132,7 @@ func consumer(root, checkout, version, proxy, report string) error {
 	if e != nil {
 		return e
 	}
-	r := ConsumerReport{1, m.New, version, digest(mb), []FileRecord{}, []FileRecord{}, []string{}, []string{}, []CommandResult{{Command: []string{"go", "mod", "edit", "-json"}, Exit: exit}}}
+	r := ConsumerReport{Version: 1, Module: m.New, PseudoVersion: version, Candidate: digest(mb), Proxy: []FileRecord{}, Consumer: []FileRecord{}, Sum: []string{}, Graph: []string{}, Commands: []CommandResult{{Command: []string{"go", "mod", "edit", "-json"}, Exit: exit}}}
 	for _, p := range keys(payload) {
 		if e = immutableWrite(filepath.Join(base, p), payload[p]); e != nil {
 			return e
@@ -173,8 +174,32 @@ func consumer(root, checkout, version, proxy, report string) error {
 			}
 		}
 	}
-	if _, e = invoke("go", "mod", "download", m.New); e != nil {
+	selected, e := invoke("go", "list", "-m", "-json", m.New)
+	if e != nil {
 		return e
+	}
+	var selection struct {
+		Path    string
+		Version string
+		Replace json.RawMessage
+	}
+	if e = json.Unmarshal(selected, &selection); e != nil {
+		return e
+	}
+	if selection.Path != m.New || selection.Version != version || len(selection.Replace) != 0 {
+		return errors.New("effective candidate selection differs from requested pseudo-version")
+	}
+	r.SelectedVersion = selection.Version
+	downloaded, e := invoke("go", "mod", "download", "-json", m.New)
+	if e != nil {
+		return e
+	}
+	var download struct{ Path, Version, Sum, GoModSum string }
+	if e = json.Unmarshal(downloaded, &download); e != nil {
+		return e
+	}
+	if download.Path != m.New || download.Version != version || download.Sum == "" || download.GoModSum == "" {
+		return errors.New("candidate download identity or checksums missing")
 	}
 	graph, e := invoke("go", "mod", "graph")
 	if e != nil {
@@ -191,12 +216,16 @@ func consumer(root, checkout, version, proxy, report string) error {
 		return e
 	}
 	for _, line := range strings.Split(string(sum), "\n") {
-		if strings.HasPrefix(line, m.New+" ") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == m.New && (fields[1] == version || fields[1] == version+"/go.mod") {
+			if len(fields) != 3 || !strings.HasPrefix(fields[2], "h1:") || len(fields[2]) != 47 {
+				return errors.New("invalid candidate checksum line")
+			}
 			r.Sum = append(r.Sum, line)
 		}
 	}
 	sort.Strings(r.Sum)
-	if len(r.Sum) != 2 {
+	if len(r.Sum) != 2 || strings.Fields(r.Sum[0])[1] != version || strings.Fields(r.Sum[1])[1] != version+"/go.mod" || strings.Fields(r.Sum[0])[2] != download.Sum || strings.Fields(r.Sum[1])[2] != download.GoModSum {
 		return errors.New("expected module and go.mod checksum lines")
 	}
 	after, _, e := tree(checkout)
