@@ -135,7 +135,7 @@ must supply authenticated logs rather than forged event streams.
 Opt-in declarations are explicit; the tool does not pretend to infer all
 environment-sensitive behavior from syntax. The public fixture reports a
 normal opt-in skip, then separately exercises the opt-in and build-tagged tests.
-The private lane-1 acceptance run must have no skips and no name masks.
+The lane-1 acceptance run must have no skips and no name masks.
 
 ### mutate
 
@@ -174,7 +174,7 @@ MVS minimum refuses. Checksums must have exactly the candidate zip and `/go.mod`
 that version and match `go mod download -json`. Historical and unrelated
 checksum lines are preserved and excluded from the candidate checksum pair.
 A v0 pseudo-version labels a disposable candidate; the synthetic timestamp/revision in the example
-is not an attestation of a real release. Private workflows derive those values
+is not an attestation of a real release. Hosted workflows derive those values
 from the pinned candidate commit. Later release gates use immutable tags and
 normal release checksum policy.
 
@@ -216,7 +216,10 @@ its Go toolchain from the board's `tools/board-cli/go.mod`. The reviewed prototy
 candidate retains that module's requirements, changes its module path to
 `github.com/relux-works/swarma-session-host`, and removes its two unrelated local
 board-library replacements. The empty version-1 projection adapter table is
-explicit. No tests, fixtures or goldens are patched.
+explicit. No tests, fixtures or goldens are patched. The opt-in declaration currently names
+the two Claude live smokes and Muse real-provider budget pause. Other
+environment-sensitive skips remain recorded with their observed reasons; the
+helper does not claim a complete environment-condition inference.
 
 Lane 1 runs exactly:
 
@@ -229,7 +232,10 @@ The same full command supplies the mutation baseline and every mutant run.
 (narrowing HTTPS out of the admitted normalization class), and remote board
 identity. Each must fail `TestBoardKeysCanonicalizeAndIsolateBoards`. Baseline
 failures and compile errors do not count as kills. Full suite failures remain
-red even if a named mutant is killed. Inventories distinguish source declarations
+red even if a named mutant is killed. Inventory discovery is scoped to the two
+tested packages at their original module-relative paths, with unchanged test and
+fixture bytes copied into a separate inventory tree. Unrelated board CLI tests
+are outside this lane's stated bound. Inventories distinguish source declarations
 from dynamic subtests; inactive build-tagged tests remain visible. No runtime
 skip, failed test, unknown execution or untagged unobserved test is admitted.
 Tagged declarations are inventoried without enabling the board's opt-in tagged

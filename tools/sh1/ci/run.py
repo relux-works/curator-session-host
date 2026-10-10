@@ -61,6 +61,14 @@ def counts(inventory):
             "not_observed": sum(t["status"] == "not_observed" for t in tests)}
 
 
+def inventory_source(checkout, destination):
+    """Inventory the two tested packages at their original module-relative paths."""
+    destination.mkdir()
+    shutil.copyfile(checkout / "go.mod", destination / "go.mod")
+    shutil.copytree(checkout / "internal/sessionmanager", destination / "internal/sessionmanager")
+    return destination
+
+
 def publish_local_module(root, proxy):
     """Declared retained board libraries, not a replacement of the candidate."""
     module = root.joinpath("go.mod").read_text().splitlines()[0].split()[1]
@@ -187,7 +195,8 @@ class Lane:
         self.summary["guard_declaration_hash"] = sha(guards)
         events = self.temp / "tests.jsonl"
         self.command(TEST_COMMAND, self.checkout, required=False, events=events)
-        result = self.command([self.tool, "inventory", "-source", self.checkout,
+        source = inventory_source(self.checkout, self.temp / "inventory-source")
+        result = self.command([self.tool, "inventory", "-source", source,
                                "-events", events, "-guards", guards,
                                "-report", self.reports / "inventory.json"], required=False)
         if result.returncode:

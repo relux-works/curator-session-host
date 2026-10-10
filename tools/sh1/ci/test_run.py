@@ -75,3 +75,27 @@ class CommandEvidenceTests(unittest.TestCase):
                                  required=False, events=events)
             self.assertEqual(instance.summary["commands"][0]["exit"], 7)
             self.assertEqual(events.read_text(), "malformed\n")
+
+
+class InventoryScopeTests(unittest.TestCase):
+    def test_scope_preserves_recursive_test_bytes_without_unrelated_declarations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            checkout = root / "checkout"
+            package = checkout / "internal/sessionmanager"
+            child = package / "musepty/testdata"
+            child.mkdir(parents=True)
+            (checkout / "go.mod").write_text("module example.org/board\n\ngo 1.25.5\n")
+            (package / "host_test.go").write_bytes(b"package sessionmanager\n// unchanged test bytes\n")
+            (child / "golden.txt").write_bytes(b"unchanged fixture\n")
+            other = checkout / "internal/unrelated"
+            other.mkdir()
+            (other / "one_test.go").write_text("package unrelated\nfunc TestMain() {}\n")
+            (other / "two_test.go").write_text("package unrelated\nfunc TestMain() {}\n")
+            result = lane.inventory_source(checkout, root / "inventory")
+            self.assertEqual((result / "internal/sessionmanager/host_test.go").read_bytes(),
+                             (package / "host_test.go").read_bytes())
+            self.assertEqual((result / "internal/sessionmanager/musepty/testdata/golden.txt").read_bytes(),
+                             (child / "golden.txt").read_bytes())
+            self.assertEqual((result / "go.mod").read_bytes(), (checkout / "go.mod").read_bytes())
+            self.assertFalse((result / "internal/unrelated").exists())
