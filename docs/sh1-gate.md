@@ -245,8 +245,9 @@ module graph and sanitized environment identities.
 | --- | --- | --- | --- |
 | [38015721398](https://github.com/relux-works/curator-session-host/actions/runs/38015721398), initial snapshot | 40 s | 59 s | Both green |
 | [38015843173](https://github.com/relux-works/curator-session-host/actions/runs/38015843173), strengthened refusal tests | 31 s | 43 s | Both green |
+| [38016057110](https://github.com/relux-works/curator-session-host/actions/runs/38016057110), implementation and workflow verification | 43 s | 62 s | Both green |
 
 Durations are measured from the hosted jobs' started/completed timestamps,
-including setup and artifact upload. Both recorded snapshots passed every
+including setup and artifact upload. All recorded snapshots passed every
 public matrix step. These measurements concern synthetic tooling only; private
 source/consumer gate durations remain unknown.
