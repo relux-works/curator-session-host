@@ -1,6 +1,6 @@
 # curator-session-host: specification
 
-- **Status:** draft r4 (2026-10-10; §3.7 wake and liveness added the same day). Nothing has been moved yet.
+- **Status:** draft r4 (2026-10-10; §3.7 wake and liveness, §3.8 goals across accounts and the final names added the same day). Nothing has been moved yet.
 - **Normative language:** MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 - **Lineage:** continues the earlier session-host specification and the as-is extraction plan (revision 2, frozen as the reference alternative on 2026-10-05). The owner chose the as-is path on 2026-10-09: extract one to one first, then bring the host to the platform's rules. r3 closed the frozen plan's known gaps; r4 takes the architecture review of r3 (0 P0, 8 P1, 4 P2).
 - **Companions:** [curator-dispatcher](https://github.com/relux-works/curator-dispatcher) (admission, allocations, executions, the session-host backend gate), [curator-host-helper](https://github.com/relux-works/curator-host-helper) (agent accounts, the launcher, `exec.stop`), [curator-credential-broker](https://github.com/relux-works/curator-credential-broker), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge), the platform architecture §5.1, §5.3, §7.5.
@@ -102,24 +102,24 @@ Each item below is an **activation gate**: it is designed and tested before it i
 
 ### 3.1 Service account, state and capabilities
 
-- The host moves to its own service account `swarma-host` (home `/opt/swarma/services/swarma-host`) only after the direct file APIs (notice inbox writes, context-state reads by the board) are replaced by authenticated calls, and only together with agent-account holders (§3.2). Running harnesses as the service account is not a boundary.
-- The socket directory `/opt/swarma/run/host/` has published permissions that let authorised principals connect while the data stays private. Connections follow broker §4.1: kernel peer UID, server identity check, close-on-exec, one role per connection; managed principals by `(uid, generation)`.
+- The host moves to its own service account `swarma-session-host` (home `/opt/swarma/services/swarma-session-host`) only after the direct file APIs (notice inbox writes, context-state reads by the board) are replaced by authenticated calls, and only together with agent-account session runners (§3.2). Running harnesses as the service account is not a boundary.
+- The socket directory `/opt/swarma/run/session-host/` has published permissions that let authorised principals connect while the data stays private. Connections follow broker §4.1: kernel peer UID, server identity check, close-on-exec, one role per connection; managed principals by `(uid, generation)`.
 - Capabilities: issued by the host to a logical session and its execution, with audience, actions, expiry and revocation; parent and child relationships are authoritative host records; replacement rotates execution-scoped authority; controller epochs are reconciled before effects. The legacy global token is refused after activation. Trusted audit and transcript evidence lives at the service boundary, not in agent-writable files.
 
 ### 3.2 Holders under agent accounts and the process tree
 
-Before holders are activated, the ownership table is frozen:
+Before session runners are activated, the ownership table is frozen:
 
 | Concern | Owner |
 |---|---|
-| the PTY master or app-server transport | an agent-side holder: `curator-executor` in holder mode, started by the launcher under the agent account |
-| the credential lease client (renewals for Codex app-server) | the same agent-side holder, for the whole execution |
+| the PTY master or app-server transport | the session runner `swarma-session-runner`, one process per session, started by `swarma-user-launcher` under the agent account |
+| the credential lease client (renewals for Codex app-server) | the same agent-side session runner, for the whole execution |
 | durable metadata, logs, receipts | the host service |
 | admission, allocation and execution records, cleanup | the dispatcher |
-| stop | the dispatcher, through the helper's `exec.stop` (no stop through sudo) |
+| stop | the dispatcher, through the user manager's `exec.stop` (no stop through sudo) |
 
-- The holder talks to the host over an authenticated channel compatible with the launcher's descriptor rules (plan on descriptor 3, nothing else inherited); a replacement host re-authenticates and reconnects.
-- Dispatcher recovery distinguishes an absent controller, a live authenticated holder, an absent execution and unknown evidence; only confirmed absence permits replacement or cleanup. Controller-only re-adoption keeps the execution id; a new exec gets a new one.
+- The session runner talks to the host over an authenticated channel compatible with the launcher's descriptor rules (plan on descriptor 3, nothing else inherited); a replacement host re-authenticates and reconnects.
+- Dispatcher recovery distinguishes an absent controller, a live authenticated session runner, an absent execution and unknown evidence; only confirmed absence permits replacement or cleanup. Controller-only re-adoption keeps the execution id; a new exec gets a new one.
 - Start, readiness and exit receipts are acknowledged and replayable; capacity release follows confirmed absence.
 
 ### 3.3 Backend activation with the dispatcher and the helper
@@ -134,7 +134,7 @@ Enabled only with jointly pinned host, dispatcher and helper versions:
 
 ### 3.4 Effects, fences and admission
 
-- **Effect matrix.** Every effect — enqueue, deliver, steer, interrupt, goal and control calls, attach, start, wake, retry, probe, holder re-adoption — has its fence and epoch rule and idempotent `op_id` behaviour. A closed fence may queue but not deliver; only the operation holding the fence may restart; an explicit stop stays stopped; after a controller failure nothing writes to holders before reconciliation.
+- **Effect matrix.** Every effect — enqueue, deliver, steer, interrupt, goal and control calls, attach, start, wake, retry, probe, session runner re-adoption — has its fence and epoch rule and idempotent `op_id` behaviour. A closed fence may queue but not deliver; only the operation holding the fence may restart; an explicit stop stays stopped; after a controller failure nothing writes to session runners before reconciliation.
 - **One node admission authority** relates the dispatcher's capacity and execution claims, the host's fences, ticket redemption and the permits held through start or verified re-adoption. Every starter is inventoried (board runners, manual and alias launchers, restart and recovery consumers, probes, retries, fallback legs, mixed-version clients); an unsupported participant blocks shared mutation. Unknown permits stay owned; unreadable state is closed; ordinary restart closure is separate from an operator's update lock, which only the operator clears.
 
 ### 3.5 Park, restart, emergency stop, board completion
@@ -157,7 +157,7 @@ No hosted agent re-arms its own wake-up; there is no `wait` for the model to for
 |---|---|
 | receive mail for an agent identity and hold it durably | the bridge (carrier provider and Mailbox); it enqueues into the host's per-session inbox and counts delivery only after the host's durable write |
 | decide when to deliver (the doorbell) | the host, the only writer of a session's input; it delivers at a turn boundary |
-| report the turn boundary, idleness and heartbeats | the holder (§3.2), through the adapter's readiness grammar: Claude PTY or stream output, Codex app-server turn events; an unknown readiness parks rather than guesses |
+| report the turn boundary, idleness and heartbeats | the session runner (§3.2), through the adapter's readiness grammar: Claude PTY or stream output, Codex app-server turn events; an unknown readiness parks rather than guesses |
 | detect a wedged session | the host: pending inbox items, and the session neither idle nor progressing past its deadline |
 | recover | the host's restart transaction (§3.5) under a new controller epoch, then redelivery, idempotent by sender and message id; the dispatcher only for execution absence and cleanup (§3.2) |
 | never woken | an explicitly stopped or parked session, a closed fence (it queues, it does not deliver), a session that needs re-authentication (parked) |
@@ -165,6 +165,23 @@ No hosted agent re-arms its own wake-up; there is no `wait` for the model to for
 A wake is an effect in the §3.4 matrix: fenced, epoch-checked, with an idempotent `op_id`. The binding from an agent identity to a session names the session, the execution and the epoch, so a wake after a restart never reaches a stale session. Claude Code and Codex are covered; Muse after its qualification (§3.6).
 
 Until SH2+ is active, interim rails live outside this module: a per-identity watcher that holds the wait itself and injects one fixed line only into an idle session with an empty input line and never into one the operator stopped; and, for sessions in today's daemon, its notice path, which delivers only while a client is attached (§1.1).
+
+### 3.8 Goals across accounts
+
+The board, the host and the agent run under three different accounts:
+- the board runs under the orchestrator's account or its service account;
+- the host runs under `swarma-session-host`;
+- the session runner and the harness run under the agent's account.
+
+A goal crosses the boundaries like this:
+1. The orchestrator sets or updates a goal on the board, as today.
+2. The board's goal binding calls the host's socket: apply revision N to session S. The host identifies the caller by its kernel peer credentials (UID and active generation). It requires a capability for S that it issued to that principal when the session was created at its request; the capability carries audience, actions (apply and roll back goals, deliver, stop), expiry and revocation. The host also requires S's fence to be open.
+3. The host records the revision durably. At the next turn boundary it hands the revision to the session runner of the current epoch, which writes it into the harness input (§3.2, §3.7) and returns the harness's acknowledgement.
+4. The host answers the board: applied, deferred, or rolled back with the joined error, as in today's goal seam.
+
+An agent cannot set its own goal: its account has no goal capability on the host socket, and the session runner accepts input only from the host. A session runner proves it belongs to S's execution through the launcher ticket it was started with, and the host talks only to the session runner of the current epoch. Revoking the orchestrator's grant or the session capability stops goal operations at once; stopping the execution stays with the dispatcher (`exec.stop`).
+
+In SH2+ the module also ships the host service binary, and the board becomes its client over this socket instead of compiling the session manager in.
 
 ## 4. Estimates
 
@@ -193,7 +210,7 @@ With continuous agent coverage, SH1 fits in 3–4 calendar days clean and about 
 
 ## 6. Out of scope
 
-Terminal backends other than the per-session holder (tmux), the `ax` backend, the three-operating-system demo, GUI and mobile distribution.
+Terminal backends other than the per-session session runner (tmux), the `ax` backend, the three-operating-system demo, GUI and mobile distribution.
 
 ## 7. Open questions
 
