@@ -56,6 +56,26 @@ class BaselineEquivalenceTests(unittest.TestCase):
             package["tests"].reverse()
         self.assertTrue(lane.compare_inventories(before, after, 0, 0)["equivalent"])
 
+    def test_unselected_testdata_declarations_are_retained_and_compared(self):
+        inv = self.inventory()
+        inv["packages"].append({"package": lane.PACKAGE + "/testdata/fake_msp_server",
+                                "status": "not_observed", "tests": [
+                                    {"name": "TestFixture", "file": "internal/sessionmanager/testdata/fake_msp_server/main_test.go",
+                                     "status": "not_observed", "executed": False}]})
+        self.assertEqual(lane.compare_inventories(inv, inv, 0, 0)["outcomes_compared"], 10)
+        changed = copy.deepcopy(inv)
+        changed["packages"][-1]["tests"][0]["name"] = "TestOtherFixture"
+        self.assertFalse(lane.compare_inventories(inv, changed, 0, 0)["equivalent"])
+        for suffix in ("/other", "/testdata_not_fixture/fake"):
+            invalid = copy.deepcopy(inv)
+            invalid["packages"][-1]["package"] = lane.PACKAGE + suffix
+            with self.assertRaises(ValueError):
+                lane.compare_inventories(invalid, invalid, 0, 0)
+        invalid = copy.deepcopy(inv)
+        invalid["packages"][-1]["tests"][0].update(status="pass", executed=True)
+        with self.assertRaises(ValueError):
+            lane.compare_inventories(invalid, invalid, 0, 0)
+
     def test_identical_known_baseline_failures_are_recorded_and_equivalent(self):
         inv = self.inventory()
         inv["packages"][0]["status"] = "fail"

@@ -236,7 +236,9 @@ unmodified board and records `baseline-inventory.json`; it then projects the
 candidate and runs that identical command, recording `inventory.json`.
 `equivalence.json` compares each `(package, test)` outcome in both directions,
 including dynamic subtests, skip reasons, declaration paths, tags, opt-in
-conditions and unobserved tagged declarations. Package outcomes and actual test
+conditions and unobserved tagged declarations. Recursive fixture packages below
+`testdata/` remain inventoried and compared as unobserved outside the two-package
+command scope; untagged absence in either tested package still refuses. Package outcomes and actual test
 command exits must also match. A changed outcome, missing test, changed skip
 reason, absent package, unknown reason or malformed/partial evidence is red.
 Counts alone do not prove equality. No tests, fixtures or goldens are patched.
@@ -301,10 +303,65 @@ This development proof does not gate the separate Muse-cut freeze.
 ## Baseline-equivalence rework evidence
 
 The resolved 2026-10-10 gate decision supersedes the old strict no-skip and guard
-admission blocker packet below. Fresh hosted run identities and exact outcomes
-will be recorded here before review handoff. Historical runs are retained with
-their real failures and cancelled-job limits; they are not baseline-equivalence
-evidence.
+admission blocker packet below. This worker triggered and collected fresh
+[tooling run 38032951924](https://github.com/relux-works/swarma-session-host/actions/runs/38032951924)
+and [lane run 38032951891](https://github.com/relux-works/swarma-session-host/actions/runs/38032951891).
+They use signed public snapshot `b97f1a5c5edd78349318d5b4f110e97d057e9b4c`
+(tree `0f8ee64f9d0fa832f1b4282427b94baf804a72c5`) and board main resolved once to
+`19bfb961e65c2d63fcb7a06f4bad054432519c4c`. The Story working tree remains
+uncommitted; later documentation changes do not alter tested inputs. The earlier
+strict-policy runs below are inherited evidence, not fresh baseline-equivalence
+proof.
+
+| Identity | SHA-256 |
+| --- | --- |
+| Generator | `97501ea8ccfeb9427961ff68c316aa27e6a56f037ddb241ac78f56702c6db752` |
+| Manifest | `a0fa185a8135d5a63085f296ec8337b1472f086ce73891277c413df93fc445c7` |
+| Transform | `d678d4b3921722416f04a2a149268b9597d08e2b95326ec00d3e2736666500f9` |
+| Source go.mod | `b06d4da806e5337faf6f1485b13a6676e16fe60f3c1b4ab62758d64f7c832f60` |
+| Candidate go.mod | `7622e5ff5ec276bcf97f3554dd65d531838d266c1e71444f3d3ab4b29a3ab6d4` |
+| Workflow | `86dd51cbaa83d9310c66d6f5ecfe826ba053633f9c4a58d070e71403f228570a` |
+| Lane helper | `c3b97af5a6899597161af5a58cd9c666b6a2612c649e6b547fd656dc36c83aaf` |
+| Helper regression tests | `e27dde74a472859b98e0a1d2da25133802a8bbbaffac8be2341f67549d60dbde` |
+| Empty adapter declaration | `e5a76fe3d134f87e636debc55cc15ac01dbd2bbf0ed1edac80c0f3b35a228eb3` |
+| Mutation declaration | `531deb1fb41299dc8efbe9c31787c30f686b5bcf931cb71ed139f38e91fe83f8` |
+
+The recursive manifest has 290 files, including the candidate module
+file, with 195 protected package files. All three jobs derive their Go
+1.25.5 toolchain from the same board go.mod; GOTOOLCHAIN is local and GOWORK is off.
+
+The tooling jobs pass on Ubuntu (43 s) and macOS (42 s): 10 Python regression
+tests, the unmasked Go race/refusal/fixture suite, formatting, vet and build,
+all exit 0. New regressions drive `Lane.projection` and the real `mutate` CLI;
+they refuse changed outcomes/skip reasons, disappearing tests, missing or unknown
+inventories and lost failed-baseline output. The existing narrowing experiment
+also passes. Raw diagnostic streams remain in job logs, excluded from artifacts.
+
+The consumer job passes in 84 s; helper duration 45.546 s.
+`consumer`, `go build ./...` (25.264 s) and `go vet ./...`
+(12.315 s) each exit 0. Selection/download/graph commands also exit 0.
+The file proxy selects `v0.0.0-20261010070104-b97f1a5c5edd` with these two candidate lines:
+
+```text
+github.com/relux-works/swarma-session-host v0.0.0-20261010070104-b97f1a5c5edd h1:DpDd6k8khI7nqm9qPI/UlKekgZFa5ymsx3qoFG+eKoo=
+github.com/relux-works/swarma-session-host v0.0.0-20261010070104-b97f1a5c5edd/go.mod h1:+/vQzHkzfzWcTK+Tiirk8mscTIpoOkr6eEc0K2yvpfk=
+```
+
+`consumer.json` SHA-256 is `3d4e2ce16bc41364a63858e33ab094d21cc71832a71e3d0b944978e796c58ca5`,
+with 60 module-graph rows and all proxy hashes. No candidate replacement is
+present; the two unrelated retained-library replacements keep their documented
+prototype role. Tests requiring board-internal access remain in lane 1.
+
+This initial rework attempt refused after the baseline: both inventory CLIs
+exit 1 for 0/10 guard reads, then the helper exits 1 because its package-set
+validation incorrectly rejected nine unselected `testdata/fake_msp_server`
+declarations. macOS baseline tests exit 0; Ubuntu baseline tests exit 1 with
+`TestMuseR31StopReportsUnrequestedSignalDeath` and its six subtests listed below.
+No projection or mutation runs execute in this attempt; equivalence and kills
+are unproven. The checker is corrected to retain and compare fixture declarations
+outside the unchanged command's scope, with a new negative boundary regression.
+The full corrected hosted run is pending. Historical failures and cancellations
+remain visible below.
 
 ## Historical lane 1 and 2 evidence (superseded admission policy)
 

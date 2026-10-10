@@ -31,21 +31,30 @@ def outcome_set(inventory):
     packages = {p["package"]: p for p in inventory["packages"]}
     if len(packages) != len(inventory["packages"]):
         raise ValueError("duplicate inventory package")
-    if set(packages) != {PACKAGE, PACKAGE + "/musepty"}:
-        raise ValueError("inventory must contain exactly both tested packages")
+    tested = {PACKAGE, PACKAGE + "/musepty"}
+    if not tested.issubset(packages):
+        raise ValueError("inventory must contain both tested packages")
     outcomes = {}
-    for name in (PACKAGE, PACKAGE + "/musepty"):
+    for name in sorted(packages):
         row = packages[name]
-        if row["status"] not in ("pass", "fail"):
+        # Recursive discovery retains fixture declarations. Go's unchanged
+        # two-package command does not select packages below testdata.
+        fixture = name.startswith((PACKAGE + "/testdata/", PACKAGE + "/musepty/testdata/"))
+        if name not in tested and not fixture:
+            raise ValueError("unexpected inventory package: " + name)
+        if row["status"] not in (("not_observed",) if fixture else ("pass", "fail")):
             raise ValueError("package outcome is unknown: " + name)
-        outcomes[(name, "")] = {"status": row["status"]}
+        outcomes[(name, "")] = {"status": row["status"], "scope": "fixture" if fixture else "tested"}
         tests = row["tests"]
-        if not tests or not any(t.get("executed") for t in tests):
+        if not tests or (not fixture and not any(t.get("executed") for t in tests)):
             raise ValueError("no tests executed: " + name)
         for test in tests:
             status = test["status"]
             tagged_absence = status == "not_observed" and test.get("tags") and not test.get("executed")
-            if not tagged_absence and (status not in ("pass", "fail", "skip") or not test.get("executed")):
+            fixture_absence = fixture and status == "not_observed" and not test.get("executed") and test.get("file")
+            if fixture and not fixture_absence:
+                raise ValueError("unexpected fixture execution: " + name + "/" + test["name"])
+            if not fixture_absence and not tagged_absence and (status not in ("pass", "fail", "skip") or not test.get("executed")):
                 raise ValueError("unknown test outcome: " + name + "/" + test["name"])
             if status == "skip" and test.get("reason", "unknown") in ("", "unknown"):
                 raise ValueError("skip reason is unknown: " + name + "/" + test["name"])
