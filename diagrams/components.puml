@@ -1,0 +1,91 @@
+@startuml
+title M-SH1 - Logical host concerns and account boundaries (SH2+ target)
+left to right direction
+
+component "Optional board client\nor authorised launching caller\ninitiating account" as caller
+database "Optional goal ledger / board evidence\nowner: board; not host lifecycle" as board_state
+component "agent-session-bridge\nprocess UID unspecified in spec §3.7" as bridge
+database "Mailbox\nowner: bridge" as mailbox
+component "swarma-dispatcher\nadmission / execution / cleanup process" as dispatcher
+database "Execution / allocation / admission records\nowner: dispatcher" as execution
+component "swarma-user-manager / swarma-user-launcher\nprivileged generation / stop / root launch boundary" as manager
+database "Active-generation ledger\nowner: user manager (root-owned)" as generations
+component "swarma-credential-broker\nauth-owner process" as broker
+
+package "swarma-session-host process / service account\nlogical responsibilities, not a published code decomposition" {
+  component "Session engine / controller" as engine
+  component "Peer identity / capability admission\nfence / epoch / op_id checks" as admission
+  component "Durable transcript / receipt handling" as receipts
+  component "Optional goal revision application" as goals
+  component "Inbox / wake / liveness" as wake
+  component "Pending native interaction / approval" as approval
+  component "Provider readiness / acknowledgement adapters" as adapters
+  database "Host-private durable metadata, logs, transcripts, receipts\nfences / epochs / inbox / goal revisions\nowner: host service" as durable
+}
+component "swarma-session-runner\nworker-<label>; one per session\nPTY master / private app-server transport / lease client" as runner
+component "Claude Code / Codex private app-server\nworker-<label>; provider harness process" as harness
+
+caller --> board_state : optional board transactions
+caller --> admission : generic optional goal / session calls
+bridge --> mailbox : durable mail ownership
+bridge --> admission : enqueue; durable host write before acknowledgement
+admission --> generations : verify active managed generation
+admission --> engine : admit effects only with valid fence / epoch / authority
+engine --> dispatcher : execution start / stop / absence and cleanup
+dispatcher --> execution : owns execution records
+dispatcher --> manager : stop via exec.stop
+manager --> generations : owns generation records
+engine --> receipts : reconcile unknown before reopening
+engine --> goals : optional revision handling
+engine --> wake : turn boundary / wedge recovery
+engine --> approval : pending interaction resolution
+goals --> durable : record revision
+wake --> durable : durable inbox / fence state
+approval --> durable : durable receipt / interaction state
+receipts --> durable : authoritative audit / transcript / receipts
+engine --> adapters : current runner input and readiness
+adapters <--> runner : host-authorised input / harness ack / heartbeat
+runner --> harness : transport owner
+runner --> broker : renew execution credential lease
+
+note bottom of admission
+  Refusal: wrong peer, inactive/unknown generation, invalid capability,
+  stale epoch, unsupported starter; agent account has no goal capability.
+  Unknown permits remain owned; unreadable state is closed.
+  Machine-local context policy stays independent of board facts (§2.3).
+end note
+note bottom of receipts
+  Matching input marker in intact transcript proves applied.
+  Confirmed absence permits redelivery; unresolved stays unknown.
+  Unknown approval/control effect cannot auto-replay (§3.4).
+end note
+note bottom of engine
+  Recovery: no runner input before reconciliation; live authenticated runner
+  re-adoption retains execution ID, new exec gets new ID (§3.2).
+  Explicit stop stays stopped; park is durable; restart owns its fence (§3.5).
+  Internal APIs / engine classes: unspecified in spec §3.
+end note
+note bottom of adapters
+  Unknown readiness parks; Muse requires qualification.
+  Codex renewal timeout fails turn with no fallback (§3.2).
+  Current / SH1: all serving concerns remain composed into tb-sessiond;
+  daemon owns Claude PTY and private Codex app-server (§1, §2).
+  Claude: exact rendered revision ack / deferral; Codex: text directives,
+  native goals disabled. Muse adapter behavior retained but unregistered.
+  Muse factories stay unregistered; hosted capability route refuses.
+end note
+note bottom of approval
+  First valid CAS resolution only; ordinary user turn is not approval.
+  Restart invalidates historical approval; fence invalidates pending interaction.
+  Receipt / approval and optional goal wire/state schemas:
+  unspecified in spec §7; publication is an activation gate.
+end note
+
+legend bottom
+  [[../spec/session-host.md#3-phase-sh2-platform-canons Spec §3: gated logical responsibilities]]
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: effects and approvals]]
+  [[../spec/session-host.md#37-wake-and-liveness Spec §3.7: inbox and wake]]
+  [[../spec/session-host.md#38-goals-across-accounts Spec §3.8: optional goals]]
+  [[../spec/session-host.md#7-open-questions Spec §7: unpublished decomposition and schemas]]
+endlegend
+@enduml

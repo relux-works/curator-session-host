@@ -7,6 +7,13 @@ The recursive source snapshot and the actual three-lane proof remain later work.
 
 ## Lanes and ownership
 
+The [M-SH4 gate deployment figure](../diagrams/sh1-gate-deployment.puml)
+shows the current hosted prototype, the full release gate in
+[spec §2.4](../spec/session-host.md#24-the-gate-three-lanes), evidence ownership
+and the operator cutover/refusal branches. The
+[storage ownership figure](../diagrams/storage-layout.puml) keeps current/SH1
+state separate from the gated SH2+ service boundary.
+
 The owner decision of 2026-10-10 supersedes the original private workflow plan.
 `sh1-lanes.yml` runs on pushes to this public repository's own branches and on
 `workflow_dispatch` with `spm_ref` (default `main`). A hosted Ubuntu job resolves

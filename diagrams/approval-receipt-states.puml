@@ -1,0 +1,69 @@
+@startuml
+title M-SH3 - Approval and delivery evidence (SH2+ target; schema pending)
+hide empty description
+
+state "Delivery receipt vocabulary\ndurable state owner: swarma-session-host service" as Receipts {
+  state "accepted" as Accepted
+  state "queued" as Queued
+  state "dispatched" as Dispatched
+  state "applied" as Applied
+  state "refused" as Refused
+  state "expired" as Expired
+  state "unknown" as Unknown
+  state "Redelivery permitted" as Redelivery
+  Dispatched --> Unknown : host / runner failure between dispatch and application
+  Unknown --> Applied : matching input marker in intact transcript
+  Unknown --> Redelivery : confirmed marker absence in intact transcript
+  Unknown --> Unknown : unresolved evidence; keep fence closed
+  note right of Queued
+    Closed fence may queue, never deliver.
+    No acknowledgement without durable host write.
+    Full accepted/queued/dispatched/refused/expired transition schema:
+    unspecified in spec §3.4 / §7; vocabulary is not an invented pipeline.
+  end note
+  note right of Redelivery
+    Reconcile before fence reopening; ordinary input may redeliver
+    with sender/message-id dedup and idempotent op_id (§3.4, §3.7).
+    Unknown approval answer / control effect MUST NOT auto-replay.
+  end note
+}
+
+state "Pending native interaction / approval\nstate and authority owner: host service" as Approval {
+  state "Pending native interaction" as Pending
+  state "First valid resolution accepted" as Resolved
+  state "Expired interaction" as ApprovalExpired
+  state "Invalidated by fence / restart" as Invalidated
+  Pending --> Resolved : authorised current execution/epoch; exact digest; unexpired; first CAS
+  Pending --> ApprovalExpired : interaction expiry; later answer cannot resolve it
+  Pending --> Invalidated : fence closes; historical approval invalid on restart
+  Pending --> Pending : refuse wrong authority / execution / epoch / digest; ordinary user turn is not resolution
+  Resolved --> Resolved : refuse later resolution; first-valid CAS already accepted
+  ApprovalExpired --> ApprovalExpired : refuse expired answer
+  Invalidated --> Invalidated : refuse stale answer
+  note right of Pending
+    Bind execution, turn, native request digest, options and expiry.
+    Automatic approval requires explicit allowlist policy.
+    Refused attempt does not imply a valid pending interaction was resolved.
+    These are conceptual views, not new wire field names or enum values.
+    Approval wire/state schema and allowlist values: unspecified in spec §7.
+  end note
+}
+
+note bottom of Approval
+  Process identities: swarma-session-host under its service account admits
+  and records; swarma-session-runner under worker-<label> owns the transport;
+  Claude Code / private Codex app-server produces native interactions.
+  Authorised caller resolves them; precise approval principal roles and
+  request/ack protocol are unspecified in spec §3.4 / §7.
+  Host transcript/audit evidence is service-private, not agent-writable.
+  Runner-side persistent delivery marker layout: unspecified in spec §3.4.
+  Current / SH1 keeps existing adapter behavior; these semantics require
+  dedicated schema publication and testing before SH2+ activation.
+end note
+
+legend bottom
+  [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: trusted state boundary]]
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: receipt reconciliation and approval]]
+  [[../spec/session-host.md#7-open-questions Spec §7: publication gates]]
+endlegend
+@enduml

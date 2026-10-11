@@ -17,6 +17,11 @@ The session host keeps agent sessions alive in the background: it starts a harne
 
 Logical ownership by the host module does not mean that the service account owns the harness or its transport. The agent account generation, execution identity and host controller epoch are separate (§3.3).
 
+Figures: [M-SH1 process/container ownership](../diagrams/containers.puml) and
+[M-SH1 logical components](../diagrams/components.puml) distinguish current/SH1
+from the gated SH2+ target. The component view groups specified responsibilities;
+it does not define new internal APIs.
+
 ### 1.1 Today *(fact, at the pinned source)*
 
 - One control plane per board, keyed by `BoardKey`; state in the user state directory; self-restoring start-up; one daemon per board.
@@ -76,6 +81,9 @@ Provider success means exactly what it means today: Claude's exact acknowledgeme
 
 ### 2.4 The gate: three lanes
 
+Figure: [M-SH4 SH1 gate deployment](../diagrams/sh1-gate-deployment.puml) shows
+lane ownership, evidence provenance, the bounded prototype and release gates.
+
 - **Lane 1, projection.** Public module CI on GitHub-hosted macOS and Ubuntu checks out the private board at one pinned commit. The owner accepted board code excerpts in public CI logs on 2026-10-10. The unchanged task-board tests run against the candidate's production sources projected at their original import path in a disposable pinned board checkout; only declared deterministic import and type adapters; test bytes, fixtures and goldens unchanged and hashed; discovered, executed, skipped and tagged-test inventories published; the guard tests' targets reached versus expected reported. This supersedes the older private/self-hosted lane 1 layout in contract row P9.
 - **Lane 2, consumer.** The release gate is the board's private consumer workflow on GitHub-hosted Ubuntu: a real board build against the **immutable public module tag** with no candidate replacement, exercising the converters, the daemon composition and the command-line behaviour; the board's whole CI (configuration, board, vendor drift, build and document guards, all CLI packages, server and regression scenarios), not only the session subsets. The current public hosted prototype uses a file GOPROXY and runs board build/vet; it does not establish this full release gate.
 - **Lane 3, module.** Public module CI on GitHub-hosted macOS and Ubuntu runs the module's own vet, race, build and declared macOS and Linux conformance. Current generic tooling and invented-fixture checks establish tooling behavior, not extracted-module conformance.
@@ -99,6 +107,9 @@ After O the old source is frozen: each change in flight gets its accepted commit
 
 ### 2.6 Cutover (C1)
 
+Figure: [M-SH4 gate and operator cutover](../diagrams/sh1-gate-deployment.puml)
+includes quiescence refusal and schema-safe rollback.
+
 - Not before the board's conference window ends (19 October).
 - **Quiescence for the whole transaction.** Before stopping the daemon, the operator closes every entry path for the affected boards: the wrappers' automatic daemon start, scheduled and recovery starts, active board runners and operator entry points, using the host's existing maintenance controls. Exclusive state ownership is held and re-checked through snapshot, binary swap, start and health verification. If quiescence cannot be established, cutover is deferred.
 - A paired release manifest names the board build, the module tag, the wire, goal and storage schema versions, and the permitted reader and writer pairs; the board build stamp stays in the daemon version, the host identity is reported separately.
@@ -112,12 +123,21 @@ Each item below is an **activation gate**: it is designed and tested before it i
 
 ### 3.1 Service account, state and capabilities
 
+Figures: [M-SH1 process ownership](../diagrams/containers.puml) and
+[M-SH4 storage ownership](../diagrams/storage-layout.puml) show service-private
+state, agent-side transports and the authenticated socket boundary.
+
 - The host moves to its own service account `swarma-session-host` (home `/opt/swarma/services/swarma-session-host`) only after the direct file APIs (notice inbox writes, context-state reads by the board) are replaced by authenticated calls, and only together with agent-account session runners (§3.2). Running harnesses as the service account is not a boundary.
 - The socket directory `/opt/swarma/run/session-host/` has published permissions that let authorised principals connect while the data stays private. Connections follow broker §4.1: kernel peer UID, server identity check, close-on-exec, one role per connection; managed principals by `(uid, generation)`.
 - Active managed generations are checked against the user manager's root-owned ledger, by default `/opt/swarma/lib/user-manager/ledger.json`. Readability is not authority; a malformed, unreadable, ambiguous or retired record is not an absent identity and cannot authorise a fallback.
 - Capabilities: issued by the host to a logical session and its execution, with audience, actions, expiry and revocation; parent and child relationships are authoritative host records; replacement rotates execution-scoped authority; controller epochs are reconciled before effects. The legacy global token is refused after activation. Trusted audit and transcript evidence lives at the service boundary, not in agent-writable files.
 
 ### 3.2 Holders under agent accounts and the process tree
+
+Figures: [M-SH1 containers](../diagrams/containers.puml),
+[M-SH1 components](../diagrams/components.puml) and
+[M-SH2 recovery sequence](../diagrams/session-recovery.puml) show runner
+ownership, re-authentication, confirmed absence and privileged launch ordering.
 
 Before session runners are activated, the ownership table is frozen:
 
@@ -156,6 +176,11 @@ D-PATH fixes the launch-scoped PATH in the digested plan: (1) this launch's prot
 
 ### 3.4 Effects, fences and admission
 
+Figures: [M-SH3 approval and receipt states](../diagrams/approval-receipt-states.puml)
+and [M-SH4 storage ownership](../diagrams/storage-layout.puml) distinguish durable
+evidence, unresolved outcomes and refusal. State labels illustrate the prose;
+they do not publish the pending wire/state schema.
+
 - **Effect matrix.** Every effect — enqueue, deliver, steer, interrupt, goal and control calls, attach, start, wake, retry, probe, session runner re-adoption — has its fence and epoch rule and idempotent `op_id` behaviour. A closed fence may queue but not deliver; only the operation holding the fence may restart; an explicit stop stays stopped; after a controller failure nothing writes to session runners before reconciliation.
 - **One node admission authority** relates the dispatcher's capacity and execution claims, the host's fences, ticket redemption and the permits held through start or verified re-adoption. Every starter is inventoried (board runners, manual and alias launchers, restart and recovery consumers, probes, retries, fallback legs, mixed-version clients); an unsupported participant blocks shared mutation. Unknown permits stay owned; unreadable state is closed; ordinary restart closure is separate from an operator's update lock, which only the operator clears.
 
@@ -164,6 +189,11 @@ D-PATH fixes the launch-scoped PATH in the digested plan: (1) this launch's prot
 A pending native interaction binds its execution, turn, native request digest, options and expiry. An authorised approval must target that pending interaction and the current execution/epoch, match the digest and remain unexpired. Compare-and-swap accepts the first valid resolution; an ordinary user turn is not an approval. Closing the fence invalidates pending interactions. Automatic approval requires an explicit allowlist policy. These are [architecture receipt and interaction requirements](https://github.com/relux-works/wiki/blob/2e30edbd54977b306ab53497663fcd94a5ca6cb6/session-host/architecture.ru.md#L376) to carry into a dedicated module wire/state schema before activation, not a claim that SH1 implements them; this revision invents no wire fields or policy values for that schema.
 
 ### 3.5 Park, restart, emergency stop, board completion
+
+Figures: [M-SH2 recovery sequence](../diagrams/session-recovery.puml) and
+[M-SH3 independent lifecycle views](../diagrams/session-goal-wake-states.puml)
+keep controller recovery, execution absence, park and optional board completion
+separate.
 
 - **Park** is a durable host operation that holds delivery closed. If a board goal is bound, the optional board client acknowledges a committed goal revision carrying the handoff reference (compare-and-swap); that board barrier is not a prerequisite for a goal-free session. The note attempt is bounded, with an explicitly marked snapshot fallback; a timeout never proves drain. The goal-free park receipt/state schema must be published before activation (§7).
 - **Restart** follows the architecture's transaction: drain external effects and child tools, request execution stop from the dispatcher through the user manager's `exec.stop`, confirm process and native-lock absence, check binding, posture, authentication, grants and runtime, initialise under a closed fence, reconcile unknown delivery, then reopen. The user manager verifies the owned generation/execution and receipt/process identity, sends TERM then KILL if needed, and returns only after confirming absence. The host does not signal the processes directly or relay signals through sudo. Unknown process evidence cannot release capacity or authorise replacement.
@@ -193,9 +223,16 @@ A wake is an effect in the §3.4 matrix: fenced, epoch-checked, with an idempote
 
 Until SH2+ is active, interim rails live outside this module: a per-identity watcher that holds the wait itself and injects one fixed line only into an idle session with an empty input line and never into one the operator stopped; and, for sessions in today's daemon, its notice path, which delivers only while a client is attached (§1.1).
 
-The explicit session/goal/wake state diagram is deferred to R-SH2 / M-SH3 (P1). Its transitions must follow this table and keep session, execution, goal acknowledgement and optional board waiting states separate.
+Figure: [M-SH3 session/goal/wake states](../diagrams/session-goal-wake-states.puml)
+follows this table and keeps session, execution, goal acknowledgement and optional
+board waiting states separate. Unspecified board transitions and pending schemas
+are noted rather than supplied by the figure.
 
 ### 3.8 Goals across accounts
+
+Figures: [M-SH1 cross-account components](../diagrams/components.puml) and
+[M-SH3 goal command/acknowledgement view](../diagrams/session-goal-wake-states.puml)
+show caller authorship, optional board ownership and host-to-runner delivery.
 
 **D-GOALS: variant (b) now.** Only the board/orchestrator for board goals, or the launching caller at start through the launcher, sets a session's goal. The agent account has no goal capability on the host socket. This keeps goal-authoring authority with the initiating caller while the separate agent namespace and its bounds await SH2+ design.
 
@@ -239,8 +276,8 @@ With continuous agent coverage, SH1 fits in 3–4 calendar days clean and about 
 | calendar gate | 19 October (owner decision 2026-10-09) |
 | r3 review F1–F12 | §1.1 and §2.1 (F1), §2.3 (F1, F2), §2.4 (F3), §2.2 and §2.5 (F4), §2.6 (F5), §3.3 (F6), §3.2 (F7), §3.1 (F8), §3.4 (F9), §3.5 (F10), §3.6 (F11), §4 (F12) |
 | R-SH1 audit A07.1–A07.10 | Service/runner and private app-server (§1, §3.1–3.2); receipt/approval schema pending (§3.4, §7); dispatcher-owned stop (§3.5); D-RESUME (§3.5–3.6); optional goals and deferred self-goals (§3.8); wake (§3.7); lane ownership and bounded tooling evidence (§2.4); tagged public module and operator cutover (§2.2, §2.5–2.6) |
-| Existing diagrams | Audit B1 and the current repository tree contain no session-host diagram files or inline diagrams to correct. External wiki/book figures belong to R-WA1/B-F2. |
-| New diagrams | R-SH2 (P1): M-SH1 process/component ownership, M-SH2 recovery sequence, M-SH3 session/goal/wake and approval/receipt states, M-SH4 storage and gate deployment. Their prose authority is this revision; the gate view must use §2.4's corrected lane 1 layout. |
+| Historical diagram inventory | Audit B1 found no session-host diagram files or inline diagrams at its pinned revision. External wiki/book figures belong to R-WA1/B-F2. |
+| Module diagrams | [R-SH2 figure index](../diagrams/README.md): M-SH1 process/component ownership, M-SH2 recovery sequence, M-SH3 session/goal/wake and approval/receipt states, M-SH4 storage and gate deployment. Their prose authority is this revision; the gate view uses §2.4's corrected lane 1 layout. Figures do not activate unpublished contracts. |
 
 ## 6. Out of scope
 

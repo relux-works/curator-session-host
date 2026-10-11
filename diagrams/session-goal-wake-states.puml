@@ -1,0 +1,126 @@
+@startuml
+title M-SH3 - Independent session, execution, goal and board views (SH2+ target)
+hide empty description
+
+state "Session / delivery fence\nowner: swarma-session-host service process" as Session {
+  state "Delivery open" as Open
+  state "Fence closed\nqueue without delivery" as Closed
+  state "Parked (durable)" as Parked
+  state "Explicitly stopped" as Stopped
+  state "Controller reconciliation" as Reconcile
+  state "Controlled restart\nonly fence-holding operation" as Restart
+  Open --> Parked : authorised park / unknown readiness / needs re-authentication
+  Open --> Closed : close fence; invalidate pending interactions
+  Open --> Reconcile : controller failure; prohibit runner input
+  Closed --> Reconcile : controller failure
+  Reconcile --> Closed : evidence unknown / unreadable; retain permits
+  Reconcile --> Open : verified re-adoption; reconciled fence, epoch and delivery evidence (§3.2-3.4)
+  Open --> Restart : authorised restart; close fence / drain
+  Parked --> Restart : explicit recovery (§3.5)
+  Stopped --> Restart : explicit recovery; no automatic restart
+  Restart --> Parked : unsupported recovery row / unknown readiness
+  Restart --> Closed : unknown absence or delivery outcome
+  Restart --> Open : confirmed absence, admitted new execution, readiness and reconciliation
+  Open --> Stopped : explicit stop (§3.4)
+  note right of Parked
+    No wake of parked or stopped sessions.
+    Goal-free park has no board barrier.
+    With board goal: optional board client acknowledges
+    committed handoff revision by CAS.
+    Bounded note attempt / marked snapshot fallback;
+    timeout never proves drain (§3.5).
+    Park wire/state schema: unspecified in spec §7.
+  end note
+  note left of Closed
+    All effects carry fence / epoch / idempotent op_id rules.
+    Operator update lock is distinct; only operator clears it.
+    Exact per-effect state schema: unspecified in spec §3.4 / §7.
+  end note
+}
+
+state "Execution (separate from session)\nrecords / capacity owner: swarma-dispatcher process" as Execution {
+  state "Live authenticated runner\nswarma-session-runner / worker-<label>" as Live
+  state "Stopping via swarma-user-manager exec.stop" as Stopping
+  state "Confirmed execution absence" as Absent
+  state "Unknown process evidence\ncapacity remains owned" as UnknownExecution
+  Live --> Live : controller-only re-adoption keeps execution ID
+  Live --> Stopping : dispatcher stop request
+  Stopping --> Absent : owned generation / receipt / process checked; TERM then KILL; absence confirmed
+  Stopping --> UnknownExecution : absence cannot be confirmed
+  UnknownExecution --> Live : confirmed live authenticated runner (§3.2)
+  UnknownExecution --> Absent : confirmed absence (§3.2)
+  Absent --> Live : separately admitted new exec; new execution ID / readiness
+  note right of Absent
+    Only confirmed absence permits release / replacement / cleanup.
+    Exit receipts are durable and replayable.
+    Exit never satisfies optional board wait (§3.5).
+    Runner owns Claude Code PTY / private Codex app-server transport and lease client.
+    User manager owns root generation ledger and stop verification.
+  end note
+}
+
+state "Wake / mail view\nbridge Mailbox and host inbox are distinct durable owners" as Wake {
+  state "Mail held durably\nowner: agent-session-bridge" as Mail
+  state "Host inbox pending\nowner: swarma-session-host" as Inbox
+  state "Delivery held" as Held
+  state "Host-directed turn-boundary input\nrunner writes harness transport" as Deliver
+  state "Wedged: pending mail and neither idle\nnor progressing past deadline" as Wedged
+  Mail --> Inbox : bridge enqueue; count delivery only after host durable write
+  Inbox --> Held : closed fence / parked / stopped / needs re-authentication
+  Inbox --> Deliver : open fence, ready boundary; current session/execution/epoch; admitted op_id
+  Inbox --> Wedged : host detects deadline condition
+  Wedged --> Inbox : host restart transaction, new controller epoch; sender/message-id dedup
+  note right of Held
+    No stale-session wake; no agent self-rearming / model wait.
+    Runner reports boundary / idleness / heartbeat via readiness grammar.
+    Unknown readiness parks (§3.7).
+    Deadline values / queue lifecycle details: unspecified in spec §3.7.
+  end note
+}
+
+state "Optional goal command / acknowledgement\nrevision owner: host; board ledger owner: optional board" as Goal {
+  state "No goal" as NoGoal
+  state "Durable revision N" as Revision
+  state "Deferred" as Deferred
+  state "Applied acknowledgement" as AppliedGoal
+  state "Rolled back with joined error" as RolledBack
+  NoGoal --> Revision : authorised caller initial goal / board client revision (§3.8)
+  Revision --> Deferred : host returns deferred
+  Revision --> AppliedGoal : current runner turn boundary / harness acknowledgement
+  Deferred --> AppliedGoal : optional compatibility adapter acknowledgement waiter (§2.3)
+  Revision --> RolledBack : optional goal seam rollback
+  note right of Revision
+    Caller peer UID / active generation and scoped capability;
+    actions, audience, expiry, revocation and open fence required.
+    Wrong authority / stale epoch / revoked capability: refuse.
+    Agent account has no goal capability (D-GOALS).
+    Goal wire / ack schema: unspecified in spec §7.
+    NoGoal does not gate any session operation (§3.8).
+  end note
+}
+
+state "Optional board waiting / terminal view\nowner: board/orchestrator, initiating account" as Board {
+  state "Board wait / completion barrier" as Wait
+  state "Board terminal disposition" as Terminal
+  note right of Wait
+    Execution exit and goal acknowledgement do not imply board completion.
+    Ledger / ancestry / outcomes / publication belong to board adapter.
+    Board state names, transition conditions and terminal enum:
+    unspecified in spec §2.2 / §3.5 / §3.8; no transitions invented here.
+  end note
+}
+
+note bottom of Session
+  Views are conceptual, not newly specified wire enums or a combined FSM.
+  Emergency stop: operator authority, bound-board snapshot if any,
+  fence and absence receipts, explicit recovery (§3.5).
+  Current / SH1 preserves tb-sessiond-owned transports and attached-client notices;
+  target wake / park / cross-account goal gates are not activated by extraction.
+end note
+legend bottom
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: fences and epochs]]
+  [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: park, restart, exit and board barrier]]
+  [[../spec/session-host.md#37-wake-and-liveness Spec §3.7: wake ownership]]
+  [[../spec/session-host.md#38-goals-across-accounts Spec §3.8: optional goal authority]]
+endlegend
+@enduml

@@ -1,0 +1,109 @@
+@startuml
+title M-SH1 - Process ownership: current / SH1 and gated SH2+
+left to right direction
+
+package "Current / SH1 extraction (no behaviour change)" {
+  node "Operator user account" as current_user {
+    component "task-board client / producers" as current_board
+    component "tb-sessiond\nboard executable + composition root\none daemon per BoardKey" as daemon
+    component "Claude Code\nPTY master held by tb-sessiond" as current_claude
+    component "Codex private app-server\none per session" as current_codex
+    database "User state directory\nboard-keyed host records / transcripts\nper-session notice inbox" as current_state
+  }
+  current_board --> daemon : compatibility seam / bearer token
+  current_board --> current_state : direct notice writes
+  daemon --> current_claude : owns PTY master
+  daemon --> current_codex : owns private app-server
+  daemon --> current_state : host state
+  note bottom of daemon
+    SH1 supplies a serving library; executable stays in board through C1.
+    Claude dies on daemon replacement; startup is self-restoring.
+    Muse MSP / musepty code is unregistered.
+    Hosted launch decodes input, then refuses capability admission.
+    Recovery details beyond these facts: unspecified in spec §1.1.
+  end note
+}
+
+package "SH2+ target - disabled until joint activation gates" {
+  node "Orchestrator account or service account" {
+    component "Optional board client" as board
+    database "Board goal ledger / run evidence\nowner: board" as board_state
+  }
+  component "Launching caller / launcher\ninitial goal author" as caller
+  component "agent-session-bridge\ncarrier / Mailbox" as bridge
+  database "Durable mail\nowner: bridge" as mail
+  node "swarma-session-host service account" {
+    component "swarma-session-host\ncontroller / input admission" as host
+    database "Metadata, logs, transcripts, receipts\nfences, controller epochs, goal revisions\nowner: host" as host_state
+  }
+  component "swarma-dispatcher\nadmission / allocation / execution / cleanup" as dispatcher
+  database "Admission, allocation, execution records\nowner: dispatcher" as dispatch_state
+  component "swarma-user-manager\nowned generation / exec.stop" as manager
+  database "Root-owned active-generation ledger\nowner: user manager" as ledger
+  node "Root launch boundary" {
+    component "swarma-user-launcher" as root_launcher
+  }
+  node "worker-<label> agent account - one runner per session" {
+    component "swarma-session-runner\nPTY master or app-server transport\ncredential lease client" as runner
+    component "Claude Code\nor qualified provider harness" as harness
+    component "Codex private app-server\nno shared pool" as appserver
+  }
+  component "swarma-credential-broker\nCodex auth owner refreshes account" as broker
+
+  board --> board_state : board facts / optional completion barrier
+  board --> host : authenticated optional goal client
+  caller --> dispatcher : request execution
+  caller --> host : authorised goal client (§3.8)
+  bridge --> mail : durable receipt of mail
+  bridge --> host : enqueue; count delivery after durable write
+  host --> host_state : durable write before acknowledgement
+  host --> dispatcher : start / execution stop request
+  dispatcher --> dispatch_state : admission and cleanup ownership
+  dispatcher --> host : launch ticket issuer
+  dispatcher --> manager : exec.stop
+  host --> manager : one-time ticket redemption as authenticated host
+  manager --> ledger : owned active generation
+  manager --> root_launcher : privileged launch boundary
+  root_launcher --> runner : receipt before UID/GID change and exec\nFD3 plan only; no broker descriptor
+  runner <--> host : authenticated reconnect / readiness / current epoch input
+  runner --> harness : owns PTY master
+  runner --> appserver : owns private transport
+  runner --> broker : open after UID change; lease renewals
+
+  note bottom of host
+    Refuse stale epoch, invalid capability, legacy global token,
+    unreadable / malformed / retired identity and unsupported starters.
+    Closed fence queues without delivery; unknown readiness parks.
+    Controller failure: reconcile before input; live runner may be
+    re-adopted with same execution ID. Replacement requires confirmed absence.
+  end note
+  note bottom of root_launcher
+    Approved executor path/digest, generation and home checked;
+    environment and descriptors reset, atomic start receipt written,
+    then groups cleared and GID/UID set.
+    Runner/host channel compatible with FD3-only inheritance:
+    unspecified in spec §7; no extra inherited descriptor assumed.
+  end note
+  note bottom of broker
+    Board runner / host ask dispatcher; they embed no broker client.
+    Agent-side curator-run is the first broker consumer and shares
+    a launch library with the runner; it executes an immutable caller plan.
+    Renewal timeout fails the turn; no native-auth fallback.
+    Broker durable layout and external service UIDs: unspecified in spec §3.2.
+  end note
+  note bottom of manager
+    Dispatcher v0 refuses interactive / resume.
+    User-manager v0/v1: sudo caller/role policy.
+    Caller-bound signed grants: v2 activation gate, grammar unpublished.
+    Stop confirms owned execution absence; unknown evidence holds capacity.
+  end note
+}
+
+legend bottom
+  [[../spec/session-host.md#1-what-the-host-is Spec §1: phases and ownership]]
+  [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: state and capabilities]]
+  [[../spec/session-host.md#32-holders-under-agent-accounts-and-the-process-tree Spec §3.2: runner and launch]]
+  [[../spec/session-host.md#33-backend-activation-with-the-dispatcher-and-the-user-manager Spec §3.3: version gates]]
+  [[../spec/session-host.md#7-open-questions Spec §7: unpublished contracts]]
+endlegend
+@enduml

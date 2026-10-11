@@ -1,0 +1,100 @@
+@startuml
+title M-SH4 - State ownership and trust boundaries (current / SH1 versus SH2+)
+left to right direction
+
+package "Current / SH1 - operator user state, one daemon per BoardKey" {
+  component "tb-sessiond\nboard executable / composed host library" as daemon
+  component "task-board producers / client" as current_board
+  database "Board-keyed session records / logs / transcripts\nlogical host state; operator user directory" as current_records
+  database "Per-session notice inbox\nboard producers write directly" as current_inbox
+  artifact "Private file: global bearer token\nany operator-user process can use it" as token
+  daemon --> current_records : host persistence / self-restoring startup
+  current_board --> current_inbox : direct writes
+  daemon --> current_inbox : deliver only while client attached
+  current_board --> token : current authentication
+  note bottom of current_records
+    Claude PTY / private Codex app-server are owned by daemon process.
+    Claude dies on replacement; restore is current behavior, not SH2 recovery.
+    File names / retention / full schema: unspecified in spec §1.1 / §2.
+    SH1 host-independent local context policy remains fail-closed (§2.3).
+  end note
+}
+
+package "SH2+ target - activation gates, not current file layout" {
+  node "swarma-session-host service account" {
+    component "swarma-session-host" as host
+    database "Service-private durable metadata / logs\ntranscripts / audit evidence / receipts\ninbox / goal revisions / fences / controller epochs\nparent-child session authority\nowner: host" as state
+    artifact "Published host socket directory\nconnect permissions separate from data privacy" as socket
+    artifact "Session + execution-scoped capabilities\naudience / actions / expiry / revocation\nissued by host" as caps
+  }
+  node "worker-<label> account" {
+    component "swarma-session-runner" as runner
+    component "Claude Code / private Codex app-server" as harness
+    artifact "Managed home / native-session lock\ncontinuity binding: home, profile, transcript digest" as home
+  }
+  component "swarma-dispatcher" as dispatcher
+  database "Admission / allocation / execution / cleanup records\nowner: dispatcher" as execution
+  component "swarma-user-manager / swarma-user-launcher\nroot launch / exec.stop boundary" as manager
+  database "Root-owned active-generation ledger\nowner: user manager" as generations
+  component "Optional board client\norchestrator account / service account" as board
+  database "Goal ledger / ancestry / run evidence\ncompletion barrier / outcomes / publication\nowner: board, outside host" as board_state
+  component "agent-session-bridge" as bridge
+  database "Durable carrier Mailbox\nowner: bridge" as mail
+  component "swarma-credential-broker\nauth owner" as broker
+
+  host --> state : durable write before acknowledgement
+  host --> caps : issue / revoke / rotate on replacement
+  board --> socket : authenticated calls replace direct file APIs
+  board --> board_state : optional adapter records
+  bridge --> mail : holds mail durably
+  bridge --> socket : enqueue into host inbox
+  runner --> socket : re-authenticate / reconnect; current epoch
+  runner --> harness : owns PTY master / app-server transport
+  runner --> home : preserves admitted native continuity
+  runner --> broker : execution lease client; no copied auth.json
+  host --> generations : check UID / active generation
+  manager --> generations : owns privileged ledger
+  dispatcher --> execution : owns execution state / capacity claims
+  dispatcher --> manager : owned execution stop / confirmed absence
+
+  note bottom of state
+    Agent-writable files are not trusted transcript/audit evidence.
+    Closed fence queues without delivery; unknown permits stay owned.
+    Unreadable state is closed, never absence.
+    Reconcile unknown delivery against intact transcript before reopening:
+    matching marker proves applied; confirmed absence permits redelivery;
+    unknown approval/control effects never auto-replay (§3.4).
+    Exact files, schema versions, retention and migration:
+    unspecified in spec §3.1 / §3.4 / §7.
+  end note
+  note bottom of home
+    Runner/harness home file ownership and persistent layout:
+    unspecified in spec §3.2 / §3.5; not a shared service credential pool.
+    Same-machine resume preserves home/profile/runtime/transport,
+    transcript digest, exclusive lock, auth and grants.
+    Breaking harness semver refuses; resume failure reports resume-failed;
+    no automatic fallback (§3.5).
+  end note
+  note bottom of socket
+    Kernel peer UID, server identity, close-on-exec, one role/connection.
+    Managed principal = UID + generation; malformed/unreadable/ambiguous/
+    retired ledger entry refuses fallback. Legacy token refused on activation.
+    Socket basename / capability wire / FD3-compatible runner channel:
+    unspecified in spec §3.1 / §7.
+  end note
+  note bottom of execution
+    Controller epoch is not ticket epoch or account generation.
+    Live authenticated runner re-adoption keeps execution ID;
+    new execution gets new ID. Unknown absence cannot release capacity.
+    External record file layouts: unspecified in spec §3.2 / §3.3.
+  end note
+}
+
+legend bottom
+  [[../spec/session-host.md#11-today-fact-at-the-pinned-source Spec §1.1: current state]]
+  [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: service state and transport trust]]
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: persistent fences and receipts]]
+  [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: native continuity]]
+  [[../spec/session-host.md#7-open-questions Spec §7: unpublished schemas]]
+endlegend
+@enduml

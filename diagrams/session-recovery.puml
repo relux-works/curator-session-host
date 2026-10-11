@@ -1,0 +1,123 @@
+@startuml
+title M-SH2 - Controller recovery and controlled restart (SH2+ target)
+actor "Initiating caller / optional board\ncaller account" as Caller
+participant "swarma-session-host\nservice account / replacement controller" as Host
+database "Host-private metadata, fences, epochs\ntranscripts, receipts, inbox, goal revisions\nowner: host" as State
+participant "swarma-dispatcher\nexecution / capacity record owner" as Dispatcher
+participant "swarma-user-manager\nroot-owned generation ledger / exec.stop" as Manager
+participant "swarma-user-launcher\nroot until UID/GID change" as Launcher
+participant "swarma-session-runner\nworker-<label>; transport + lease owner" as Runner
+participant "Harness / private Codex app-server\nworker-<label>" as Harness
+participant "swarma-credential-broker\nCodex auth-owner refresh" as Broker
+
+note over Host,Broker
+  Target only: joint ticket / host-role / runner-channel activation (§3.3, §7).
+  Dispatcher v0 refuses interactive/resume; user-manager signed grants are v2.
+  Current / SH1: tb-sessiond owns PTY/app-server; Claude dies on replacement.
+end note
+
+== Controller failure while execution may still live ==
+Host -> State : reconcile durable fence / controller epoch before effects
+note over Host,Runner : Nothing writes to runner before reconciliation (§3.4).
+Host -> Dispatcher : recover: distinguish controller, runner, execution and unknown evidence
+alt Live authenticated runner confirmed
+  Runner <-> Host : re-authenticate / reconnect to replacement controller
+  Host -> State : verified controller-only re-adoption under current epoch
+  note over Host,Runner
+    Keep execution ID; rotate execution-scoped authority on replacement.
+    Account generation, execution ID, ticket epoch and controller epoch are distinct.
+    Reconnect channel and wire: unspecified in spec §7.
+    FD3 carries only plan; no extra inherited descriptor assumed.
+  end note
+else Execution confirmed absent
+  Dispatcher -> Dispatcher : absence permits capacity release / cleanup / replacement
+else Unknown or unreadable execution evidence
+  Host -> State : keep fence closed / evidence unknown
+  Dispatcher -> Dispatcher : keep capacity owned; no replacement or cleanup
+end
+
+== Separate scenario: authorised controlled restart (§3.5), only fence holder ==
+note over Host,Runner : Controller-only re-adoption above does not itself require an execution restart.
+Caller -> Host : authorised restart / explicit recovery
+Host -> State : hold delivery closed; invalidate pending interactions
+Host -> Runner : drain external effects and child tools
+note over Host,Runner
+  Bounded note attempt may use marked snapshot fallback.
+  Timeout never proves drain; explicit stop has no automatic restart.
+  Drain protocol / failure disposition: unspecified in spec §3.5.
+end note
+Host -> Dispatcher : request execution stop
+Dispatcher -> Manager : exec.stop (owned generation / execution)
+Manager -> Manager : verify receipt / process identity; TERM then KILL if needed
+alt Process absence unresolved
+  Manager -> Manager : absence unconfirmed; no successful stop return
+  Host -> State : remain fenced; no replacement
+  Dispatcher -> Dispatcher : retain capacity
+else Process absence confirmed
+  Manager --> Dispatcher : confirmed execution absence
+  Host -> Host : confirm native-lock absence
+  alt Native-lock evidence unresolved
+    Host -> State : remain fenced; no replacement / reopening
+    note over Host,Dispatcher : Unknown admission permits stay owned (§3.4).
+  else Native-lock absence confirmed
+  Host -> Host : check binding, posture, authentication, grants, runtime
+  alt Native resume requested with violated preconditions
+    Host --> Caller : refuse incompatible version / family / home / profile / digest / lock / auth / grants / transport
+  else Supported recovery row and current authority
+    note over Host,Harness
+      Native resume: same machine, same major (0.x same minor),
+      same runtime family / home / profile pin, intact transcript digest,
+      exclusive native lock, ready auth and current grants; preserve transport.
+      Unsupported recovery rows stay visibly parked or refused.
+    end note
+    Host -> Dispatcher : newly admitted execution; new execution ID
+    Dispatcher --> Host : ticket bound to generation, execution, ticket epoch, executor, plan digest, expiry
+    Host -> Manager : redeem once for authenticated host
+    alt Wrong principal / replay / altered plan or executor / expired or revoked claim
+      Manager --> Host : refuse; no new start
+    else Valid ticket and live claim
+      Manager -> Launcher : journal redemption / launch intent / receipt atomically
+      Launcher -> Launcher : validate generation, executor and home; reset environment/descriptors
+      Launcher -> Launcher : atomic start receipt; clear groups; set GID/UID
+      Launcher -> Runner : exec approved runner; FD3 immutable plan only
+      Runner -> Broker : open broker connection after UID change (broker-mode Codex)
+      Runner -> Harness : initialise / native resume under closed host fence
+      alt Harness native resume fails
+        Runner --> Host : resume-failed
+        Host --> Caller : resume-failed; caller decides next action
+        note over Host,Harness : No automatic fallback or portable seed on native resume.
+      else Readiness unknown or re-authentication needed
+        Runner --> Host : unknown readiness / authentication not ready
+        Host -> State : park; keep delivery closed
+      else Admitted readiness reported
+        Runner --> Host : readiness / replayable start and readiness receipts
+        Host -> State : reconcile dispatched input marker against intact transcript
+        alt Matching marker
+          Host -> State : receipt applied; no duplicate delivery
+          Host -> State : reopen only after restart checks and reconciliation
+        else Confirmed marker absence in intact transcript (ordinary input)
+          Host -> State : redelivery permitted; reopen after reconciliation
+          Host -> Runner : redeliver at turn boundary, same sender/message identity and op_id
+          note over Host,Runner : This ordinary-input branch never auto-replays an unknown approval or control effect.
+        else Unresolved evidence
+          Host -> State : unknown; keep fence closed
+          note over Host,Runner : Unknown approval answer / control effect never auto-replays.
+        end
+      end
+    end
+  end
+  end
+end
+
+note over Host,Manager
+  Lost launch reply: resolve same effect ID and receipt, never a second start.
+  Cancel/redemption interlock, signature bytes and acknowledgement-crash protocol:
+  unspecified in spec §3.3 / §7; publish and test before activation.
+end note
+legend bottom
+  [[../spec/session-host.md#32-holders-under-agent-accounts-and-the-process-tree Spec §3.2: reconnect, receipts and confirmed absence]]
+  [[../spec/session-host.md#33-backend-activation-with-the-dispatcher-and-the-user-manager Spec §3.3: ticket and epoch gates]]
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: reconciliation]]
+  [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: restart and D-RESUME]]
+endlegend
+@enduml

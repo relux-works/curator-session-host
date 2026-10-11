@@ -1,0 +1,89 @@
+@startuml
+title M-SH4 - SH1 gate deployment, provenance and cutover (not SH2 activation)
+left to right direction
+
+cloud "Private board repository\nowner: board" as private_repo {
+  artifact "Pinned source commit\nunchanged tests / fixtures / goldens" as source
+  artifact "Private full consumer workflow" as private_workflow
+}
+cloud "Public swarma-session-host repository\nowner: module" as public_repo {
+  artifact "Candidate production snapshot\npublic immutable module tag at Z/C1" as candidate
+  artifact "Generic gate tooling / invented fixture\ncurrent prototype; no package moved" as tooling
+}
+artifact "Shared evidence tuple (§2.4-2.5 / What F records)\nboard commit / host tree / candidate manifest and module graph\ngenerator / transform / helper / adapters / tests / fixtures / goldens\ncommands + real exit codes / inventories / mutation named tests\ntoolchain / environment / runner class / workflow identity" as tuple
+
+node "Lane 1 - public module CI\nGitHub-hosted macOS and Ubuntu\nprocesses: checkout helper, projector, Go test / mutation runners" as lane1 {
+  artifact "Disposable private pinned board checkout\ncandidate production at original import path\ntest bytes / fixtures / goldens unchanged and hashed" as projection
+  artifact "Inventory / guard reached:expected / mutation evidence\ncurrent prototype: macOS gating, Ubuntu informative" as lane1_reports
+}
+node "Lane 2 - private board release CI\nGitHub-hosted Ubuntu\nprocesses: board build / full CI / converter and CLI exercises" as lane2 {
+  artifact "Real board consumer\nimmutable public module tag\nno candidate replacement" as consumer
+  artifact "Whole board CI evidence\nconfiguration / board / vendor drift / build / docs guards\nall CLI packages / server / regressions" as lane2_reports
+}
+node "Lane 3 - public module CI\nGitHub-hosted macOS and Ubuntu\nprocesses: vet / race tests / build / conformance runners" as lane3 {
+  artifact "Module vet / race / build\ndeclared macOS and Linux conformance (after extraction)" as module_checks
+  artifact "Current generic tooling checks\nprove tooling only, not extraction or module conformance" as tooling_checks
+}
+node "Current public lane 2 prototype\nGitHub-hosted Ubuntu\nprocesses: consumer helper / Go build and vet" as prototype {
+  artifact "Candidate via file GOPROXY\nboard build/vet only; not full release gate" as proxy
+}
+artifact "Allowlisted run reports\nowner: CI run / attached Change Request\nno private checkout, raw logs or proxy archive in artifacts" as reports
+component "Operator-controlled C1 maintenance transaction\nboard tb-sessiond executable retained through C1\npaired board build + public module serving library" as cutover
+
+source --> projection : public CI private pinned checkout\naccepted board-code exposure in public logs (2026-10-10)
+candidate --> projection : production projection only / deterministic declared adapters
+projection --> lane1_reports : discovered / executed / skipped / tagged inventories\nguard target ratios and named-test mutations
+private_workflow --> consumer : release workflow owner
+candidate --> consumer : immutable tag; whole private consumer CI
+consumer --> lane2_reports
+candidate --> module_checks : extracted module proof still future
+tooling --> tooling_checks : public tooling / invented fixture
+candidate --> proxy : current prototype path
+tuple ..> lane1_reports : same candidate/source binding
+tuple ..> lane2_reports : immutable release identity at Z/C1
+tuple ..> module_checks : same released candidate
+lane1_reports --> reports
+lane2_reports --> reports
+module_checks --> reports
+tooling_checks --> reports
+proxy --> reports : bounded prototype evidence
+reports --> cutover : release evidence + operator maintenance, not automatic deployment
+
+note bottom of lane1
+  Corrected spec §2.4 supersedes audit B4's old private-projection layout.
+  Private checkout and public logs are distinct from artifact publication.
+  Raw private bytes are never uploaded as lane artifacts.
+  Opt-in smoke / tagged mutation status remains explicit, never hidden.
+end note
+note bottom of tuple
+  No invented tuple wire format, artifact retention or CI process UIDs:
+  unspecified in spec §2.4 / docs gate guide.
+  F is provisional until snapshot closes; F proves representative lanes 1/2.
+  F failure stops SH1 at mechanical compatibility milestone;
+  board keeps dependencies. Z/C1 rerun all three lanes on released bytes.
+  Tests/builds run on CI, never development host.
+end note
+note bottom of cutover
+  Not before conference window ends (19 October).
+  Refuse/defer if all start paths cannot be quiesced or one writer unproven.
+  Hold exclusive state ownership through snapshot / swap / start / health check.
+  Paired manifest binds board build, module tag, wire/goal/storage schemas
+  and permitted reader/writer pairs; replacement guard remains.
+  Reopen only with paired identity and verified single writer.
+  Rollback requires old reader accepts every retained schema;
+  never erase later records by restoring an old snapshot (§2.6).
+end note
+note bottom of reports
+  Suites and tooling do not establish SH2 canons or runtime migration.
+  Relevant runtime ownership at SH1: board-composed tb-sessiond owns
+  Claude PTY / private per-session Codex app-server (§1 / §2.2).
+end note
+
+legend bottom
+  [[../spec/session-host.md#24-the-gate-three-lanes Spec §2.4: corrected lane ownership and failures]]
+  [[../spec/session-host.md#25-order-of-work Spec §2.5: provenance and release ordering]]
+  [[../spec/session-host.md#26-cutover-c1 Spec §2.6: operator cutover / rollback]]
+  [[../docs/sh1-gate.md#lanes-and-ownership Gate guide: current prototype versus release gate]]
+  [[../docs/sh1-gate.md#what-f-records Gate guide: evidence tuple]]
+endlegend
+@enduml

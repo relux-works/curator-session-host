@@ -28,8 +28,24 @@ Through C1 the board will consume the tagged public serving library while
 retaining the `tb-sessiond` executable and composition root. This module's
 private-fork cutover plan is superseded; the existing tooling does not establish
 extraction or runtime migration. Operator maintenance, quiescence and paired
-release identities remain required. New ownership, recovery, state and gate
-diagrams are deferred to R-SH2; this repository currently has none.
+release identities remain required.
+
+The [figure index](diagrams/README.md) maps audit rows M-SH1–M-SH4 to their
+PlantUML sources and defining spec sections:
+
+- **M-SH1:** [process/container ownership](diagrams/containers.puml) and
+  [logical components](diagrams/components.puml), with current/SH1 and gated
+  SH2+ boundaries.
+- **M-SH2:** [controller recovery and restart](diagrams/session-recovery.puml),
+  including confirmed-absence and unknown-outcome branches.
+- **M-SH3:** [session, execution, goal and wake states](diagrams/session-goal-wake-states.puml)
+  and [approval/receipt states](diagrams/approval-receipt-states.puml).
+- **M-SH4:** [storage ownership](diagrams/storage-layout.puml) and
+  [SH1 gate deployment](diagrams/sh1-gate-deployment.puml), separating the
+  current hosted prototype from the release gate.
+
+The figures mark unpublished schemas explicitly and establish no runtime
+capability. Each links back to its defining specification sections.
 
 ## Provenance
 
