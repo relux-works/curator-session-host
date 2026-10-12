@@ -37,7 +37,7 @@ package "SH2+ target - disabled until joint activation gates" {
     database "Metadata, logs, transcripts, receipts\nfences, controller epochs, goal revisions\nowner: host" as host_state
   }
   component "swarma-dispatcher\nUnix-socket service from first slice\nadmission / allocation / execution / cleanup" as dispatcher
-  database "Admission, allocation, execution records\nhost admission permit\nowner: dispatcher" as dispatch_state
+  database "Admission, allocation, execution records\nsession-scoped host admission permit\nowner: dispatcher" as dispatch_state
   component "swarma-user-manager\nowned generation / exec.stop" as manager
   database "Root-owned active-generation ledger\nowner: user manager" as ledger
   node "User-manager module / root launch boundary" {
@@ -52,12 +52,12 @@ package "SH2+ target - disabled until joint activation gates" {
 
   board --> board_state : board facts / optional completion barrier
   board --> host : authenticated optional goal client
-  caller --> dispatcher : request execution
+  caller --> dispatcher : owner-admitted start; optional session lifecycle authorisation
   caller --> host : authorised goal client (§3.8)
   bridge --> mail : durable receipt of mail
   bridge --> host : enqueue; count delivery after durable write
   host --> host_state : durable write before acknowledgement
-  host --> dispatcher : host_start (dispatch-op/1) / execution stop request
+  host --> dispatcher : host_start / host_stop (dispatch-op/1)
   dispatcher --> dispatch_state : admission and cleanup ownership
   dispatcher --> host : admission / effect / receipt evidence
   dispatcher --> manager : exec.stop
@@ -79,14 +79,15 @@ package "SH2+ target - disabled until joint activation gates" {
     Standing sessions / executions have no preset lifetime or runtime limit.
     Only explicit stop, operator action or own exit ends the session (§3.5).
     Park and restart preserve it; dispatcher runtime maximum is non-standing only.
-    Durable intent and closed fence precede host_start; permit binds
-    logical_session_id, execution_id, controller_epoch, op_id.
-    Fence change withdraws permit or sends it to reconciliation.
+    Durable intent and closed fence precede host_start.
+    Session-scoped permit: logical_session_id; owner session lifecycle authorisation.
+    Each start keeps execution_id / controller_epoch / op_id claim and fence.
+    Fence change withdraws affected start authority or requires reconciliation.
     Host failure retains dispatcher claim and closed fence.
     R-MAINT: dispatcher bounded maintenance stop; deadline bounds attempt.
     Unknown/refused stop defers maintenance; absence and reconciliation
     precede mode/state/binary changes. Keep standing allocations / identities;
-    fresh restart authority; no live dispatcher adoption or automatic expiry.
+    after R-MAINT, fresh owner admission; no live supervisor adoption or automatic expiry.
   end note
   note bottom of root_launcher
     Dispatcher starts approved runner through existing claim / effect / root receipt.
@@ -120,6 +121,22 @@ package "SH2+ target - disabled until joint activation gates" {
   end note
 }
 
+note bottom of dispatcher
+  R-SESSION: host_stop only by configured host principal for execution under permit.
+  Journaled E-stop / exec.stop / confirmed absence; host-requested, distinct from owner cancel.
+  host_stop confers no start authority.
+  R-FATE: user manager §7 owns process-class fate table beside R-FD3.
+  Survival and service-swap affected set require published unit / per-OS evidence.
+  Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
+  F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
+  Readiness needs verified service row / anchor / resolver restriction (user manager §8).
+  F-15: authenticated controls / observation / already-authorised stop stay reachable
+  while forward admission is closed; unknown records retain claims.
+  R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
+  Late results revalidated under lock; stale results never reopen delivery / admission.
+  Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
 legend bottom
   [[../spec/session-host.md#1-what-the-host-is Spec §1: phases and ownership]]
   [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: state and capabilities]]

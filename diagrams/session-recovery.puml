@@ -11,9 +11,9 @@ participant "Harness / private Codex app-server\nworker-<label>" as Harness
 participant "swarma-credential-broker\nCodex auth-owner refresh" as Broker
 
 note over Host,Broker
-  Target only: joint host_start / host admission permit / runner-channel activation.
+  Target only: joint host_start / host_stop / session-scoped permit / runner-channel activation.
   Wire / proof formats and durable crash ordering remain unpublished (§3.3, §7).
-  Dispatcher is a Unix-socket service from first slice (F-5); readiness before admission.
+  Dispatcher Unix-socket service (F-5/F-15): controls may serve with admission closed.
   Dispatcher v0 refuses interactive/resume; user-manager signed grants are v2.
   Current / SH1: tb-sessiond owns PTY/app-server; Claude dies on replacement.
 end note
@@ -49,7 +49,8 @@ note over Host,Runner
   Maintenance deadline bounds attempt, never session / execution lifetime.
   Require confirmed absence and reconciliation before mode/state/binary changes.
   Unknown/refused stop defers maintenance; keep standing allocations / identities.
-  Restart needs fresh authority; no live dispatcher adoption or automatic expiry.
+  R-MAINT withdraws permit; restart needs fresh owner admission.
+  No live supervisor adoption or automatic expiry.
 end note
 Caller -> Host : authorised restart / explicit recovery
 Host -> State : hold delivery closed; invalidate pending interactions
@@ -59,9 +60,11 @@ note over Host,Runner
   Timeout never proves drain; explicit stop has no automatic restart.
   Drain protocol / failure disposition: unspecified in spec §3.5.
 end note
-Host -> Dispatcher : request execution stop
+Host -> Dispatcher : host_stop (dispatch-op/1); permitted execution / configured host principal
 Dispatcher -> Manager : exec.stop (owned generation / execution)
-Manager -> Manager : verify receipt / process identity; TERM then KILL if needed
+Manager -> Manager : verify latest execution receipt / process identity
+Manager -> Manager : TERM / grace / KILL all generation UID processes; stop user service domain
+Manager -> Manager : verify account-wide absence over quiet period (F-13)
 alt Process absence unresolved
   Manager -> Manager : absence unconfirmed; no successful stop return
   Host -> State : remain fenced; no replacement
@@ -80,13 +83,14 @@ else Process absence confirmed
       Unsupported recovery rows stay visibly parked or refused.
     end note
     Host -> State : prepare durable session intent / closed delivery fence; new execution ID
-    Host -> Dispatcher : admit session-host executor start
-    Dispatcher -> Dispatcher : create durable host admission permit bound to\nlogical_session_id, execution_id, controller_epoch, op_id
-    Host -> Dispatcher : host_start (dispatch-op/1) with the four bound values / permit
-    alt Wrong principal / mismatched binding / altered plan or executor / cancelled claim / withdrawn or unresolved permit
+    Host -> Dispatcher : host_start (dispatch-op/1) with four per-start values / session-scoped permit
+    Dispatcher -> Dispatcher : verify owner session lifecycle authorisation; same allocation / generation
+    Dispatcher -> Dispatcher : prior claim absent; owner active; unchanged stored plan; fresh authority checks
+    Dispatcher -> Dispatcher : idempotent logical_session_id / op_id; per-start claim / fence / receipt interlock
+    alt Wrong principal / no lifecycle consent / retired owner / prior claim not absent / altered plan / cancelled claim / withdrawn or unresolved permit
       Dispatcher --> Host : refuse or reconcile; no new start
       Host -> State : keep delivery closed
-    else Current admitted claim and host admission permit
+    else Current per-start claim and session-scoped host admission permit
       Dispatcher -> Launcher : sole privileged start caller; existing claim / effect path
       Launcher -> Launcher : validate generation, executor and home; reset environment/descriptors\nexisting launch intent / atomic root start receipt
       Launcher -> Launcher : clear groups; set GID/UID
@@ -133,9 +137,25 @@ end
 note over Host,Launcher
   Cancel before privileged call prevents call. After ambiguity, dispatcher resolves
   same effect ID and root receipt, stopping execution if required; never launch twice.
-  Fence change withdraws host admission permit or sends it to reconciliation.
+  Fence change withdraws affected start authority or requires reconciliation.
   Host failure retains dispatcher claim and closed fence until reconciliation.
   Wire / proof formats and acknowledgement-crash ordering: unpublished (§7).
+end note
+note over Host,Dispatcher
+  R-SESSION: host_stop only by configured host principal for execution under permit.
+  Journaled E-stop / exec.stop / confirmed absence; host-requested, distinct from owner cancel.
+  host_stop confers no start authority.
+  R-FATE: user manager §7 owns process-class fate table beside R-FD3.
+  Survival and service-swap affected set require published unit / per-OS evidence.
+  Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
+  F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
+  Readiness needs verified service row / anchor / resolver restriction (user manager §8).
+  F-15: authenticated controls / observation / already-authorised stop stay reachable
+  while forward admission is closed; unknown records retain claims.
+  R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
+  Late results revalidated under lock; stale results never reopen delivery / admission.
+  Detailed host wait/lock graph: M-SH5 / spec §3.4.
 end note
 legend bottom
   [[../spec/session-host.md#32-holders-under-agent-accounts-and-the-process-tree Spec §3.2: reconnect, receipts and confirmed absence]]

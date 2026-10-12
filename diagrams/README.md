@@ -14,6 +14,7 @@ unspecified. Relative links inside each figure lead back to its defining section
 | M-SH3 session, execution, goal and wake states | [session-goal-wake-states.puml](session-goal-wake-states.puml) | [§3.5](../spec/session-host.md#35-park-restart-emergency-stop-board-completion), [§3.7–3.8](../spec/session-host.md#37-wake-and-liveness) |
 | M-SH3 approval and receipt states | [approval-receipt-states.puml](approval-receipt-states.puml) | [§3.4](../spec/session-host.md#34-effects-fences-and-admission), [§7](../spec/session-host.md#7-open-questions) |
 | M-SH4 storage ownership | [storage-layout.puml](storage-layout.puml) | [§3.1](../spec/session-host.md#31-service-account-state-and-capabilities), [§3.4–3.5](../spec/session-host.md#34-effects-fences-and-admission) |
+| M-SH5 host wait/lock graph | [host-wait-lock.puml](host-wait-lock.puml) | [§3.4](../spec/session-host.md#34-effects-fences-and-admission), [§7](../spec/session-host.md#7-open-questions) |
 | M-SH4 extraction gate deployment | [sh1-gate-deployment.puml](sh1-gate-deployment.puml) | [§2.4–2.6](../spec/session-host.md#24-the-gate-three-lanes), [gate guide](../docs/sh1-gate.md#lanes-and-ownership) |
 
 The inventory and kinds come from [audit B4, M-SH1–M-SH4](https://github.com/relux-works/curator/blob/48789217/.research/261010_platform-docs-audit.md#b4-missing-or-insufficient-module-diagrams--exact-proposed-files).
@@ -30,18 +31,35 @@ for non-standing executions only. Liveness deadlines and capability or approval
 expiry do not impose a standing-session lifetime. R-MAINT in those views references
 the dispatcher's bounded maintenance stop: the deadline bounds the attempt;
 confirmed absence and reconciliation precede mode/state/binary changes. Unknown
-or refused stop defers maintenance, allocations and identities stay, and restart
-needs fresh authority; no live dispatcher adoption or automatic expiry.
+or refused stop defers maintenance, allocations and identities stay, and R-MAINT
+withdraws the permit; restart needs fresh owner admission. Recovery controls
+remain reachable while forward admission is closed (F-15); no live supervisor
+adoption or automatic expiry.
 
-R-START is reflected in the M-SH1 ownership/components, M-SH2 recovery, M-SH3
-lifecycle and M-SH4 storage views: durable host intent and closed fence before
-`host_start` in `dispatch-op/1`, a dispatcher-owned host admission permit bound
-to `(logical_session_id, execution_id, controller_epoch, op_id)`, and the dispatcher
-as the sole privileged start caller. Fence changes withdraw or reconcile the
-permit; host failure retains the claim and closed fence. The fresh runner opens
-an authenticated channel; current-epoch registration and readiness precede delivery.
-Dispatcher service transport is Unix-socket from its first slice (F-5). Joint
-formats and crash ordering remain publication/qualification gates (§7).
+R-START/R-SESSION are reflected in M-SH1 ownership/components, M-SH2 recovery,
+M-SH3 lifecycle and M-SH4 storage: durable host intent and closed fence before
+`host_start`, a dispatcher-owned session-scoped **host admission permit** for one
+`logical_session_id`, and the dispatcher as sole privileged start caller. Each
+physical start keeps its own `(execution_id, controller_epoch, op_id)` claim,
+fence and receipt interlock. Successors use the owner's **session lifecycle
+authorisation**, confirmed prior-claim absence and fresh checks; replay of
+`(logical_session_id, op_id)` returns the same successor. Controlled restart,
+wedged park and emergency stop use `host_stop`, distinct from owner `cancel`
+and granting no start authority. Fence changes withdraw or reconcile the affected
+start's authority; host failure retains the claim and closed fence. Fresh runner
+channel, current-epoch registration and readiness precede delivery.
+
+The same views reference the user manager's §7 **fate table** (R-FATE), including
+service-replacement affected sets and the fence against surviving dispatcher
+writers, and F-13's single account-wide termination scope. Host deny-all egress
+and its readiness prerequisites follow R-SVC-EGRESS/user manager §8; F-15 keeps
+authorised controls reachable while admission is closed. M-SH5 publishes the
+host's R-LOCK wait/lock graph: journal and record transitions hold the state lock;
+synchronous dispatcher/runner calls do not. Per-record in-flight markers and
+late-result revalidation preserve the fence. Publication and per-platform
+qualification remain gates; none of these figures establishes survival or network
+conformance. M-SH4 also references R-GEN restore fencing, R-REBIND credential
+renewal, R-TIME and F-16's private cross-account Git administration.
 
 Sources use basic PlantUML declarations, notes, links and control flow without
 remote includes or themes. Rendering has not been performed on the development

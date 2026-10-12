@@ -7,7 +7,7 @@ database "Optional goal ledger / board evidence\nowner: board; not host lifecycl
 component "agent-session-bridge\nprocess UID unspecified in spec §3.7" as bridge
 database "Mailbox\nowner: bridge" as mailbox
 component "swarma-dispatcher\nUnix-socket service from first slice\nadmission / execution / cleanup process" as dispatcher
-database "Execution / allocation / admission records\nhost admission permit\nowner: dispatcher" as execution
+database "Execution / allocation / admission records\nsession-scoped host admission permit\nowner: dispatcher" as execution
 component "swarma-user-manager / swarma-user-launcher\nprivileged generation / stop / root launch boundary" as manager
 database "Active-generation ledger\nowner: user manager (root-owned)" as generations
 component "swarma-credential-broker\nauth-owner process" as broker
@@ -31,7 +31,7 @@ bridge --> mailbox : durable mail ownership
 bridge --> admission : enqueue; durable host write before acknowledgement
 admission --> generations : verify active managed generation
 admission --> engine : admit effects only with valid fence / epoch / authority
-engine --> dispatcher : host_start (dispatch-op/1) / stop / absence and cleanup
+engine --> dispatcher : host_start / host_stop (dispatch-op/1) / absence and cleanup
 dispatcher --> execution : owns execution records
 dispatcher --> manager : sole privileged start caller / stop via exec.stop
 manager --> generations : owns generation records
@@ -67,15 +67,16 @@ note bottom of engine
   Only explicit stop, operator action or own exit ends the session.
   Park and restart preserve it; dispatcher runtime maximum is non-standing only.
   Prepare durable intent / closed fence before host_start.
-  Permit binds logical_session_id, execution_id, controller_epoch, op_id.
-  Fence change withdraws or reconciles permit; host failure keeps claim / fence.
+  Session-scoped permit: logical_session_id; owner session lifecycle authorisation.
+  Each start keeps execution_id / controller_epoch / op_id claim and fence.
+  Fence change withdraws or reconciles affected start authority; host failure keeps claim / fence.
   Dispatcher alone starts approved runner via claim / effect / root receipt.
   Fresh authenticated channel, current-epoch registration and readiness
   precede delivery (R-START, §3.3).
   R-MAINT: bounded dispatcher maintenance stop (§3.5); deadline bounds attempt.
   Unknown/refused stop defers changes; confirmed absence and reconciliation
   precede mode/state/binary changes. Keep standing allocations / identities;
-  fresh restart authority; no live dispatcher adoption or automatic expiry.
+  after R-MAINT, fresh owner admission; no live supervisor adoption or automatic expiry.
   Internal APIs / engine classes: unspecified in spec §3.
 end note
 note bottom of adapters
@@ -101,6 +102,22 @@ note bottom of goals
   D-GOALS: agent has no goal capability; future proposal must not mutate goal.
 end note
 
+note bottom of dispatcher
+  R-SESSION: host_stop only by configured host principal for execution under permit.
+  Journaled E-stop / exec.stop / confirmed absence; host-requested, distinct from owner cancel.
+  host_stop confers no start authority.
+  R-FATE: user manager §7 owns process-class fate table beside R-FD3.
+  Survival and service-swap affected set require published unit / per-OS evidence.
+  Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
+  F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
+  Readiness needs verified service row / anchor / resolver restriction (user manager §8).
+  F-15: authenticated controls / observation / already-authorised stop stay reachable
+  while forward admission is closed; unknown records retain claims.
+  R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
+  Late results revalidated under lock; stale results never reopen delivery / admission.
+  Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
 legend bottom
   [[../spec/session-host.md#3-phase-sh2-platform-canons Spec §3: gated logical responsibilities]]
   [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: effects and approvals]]

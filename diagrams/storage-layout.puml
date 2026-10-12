@@ -33,7 +33,7 @@ package "SH2+ target - activation gates, not current file layout" {
     artifact "Managed home / native-session lock\ncontinuity binding: home, profile, transcript digest" as home
   }
   component "swarma-dispatcher" as dispatcher
-  database "Admission / allocation / execution / cleanup records\nhost admission permit\nowner: dispatcher" as execution
+  database "Admission / allocation / execution / cleanup records\nsession-scoped host admission permit\nowner: dispatcher" as execution
   component "swarma-user-manager / swarma-user-launcher\nroot launch / exec.stop boundary" as manager
   database "Root-owned active-generation ledger\nowner: user manager" as generations
   component "Optional board client\norchestrator account / service account" as board
@@ -55,7 +55,7 @@ package "SH2+ target - activation gates, not current file layout" {
   host --> generations : check UID / active generation
   manager --> generations : owns privileged ledger
   dispatcher --> execution : owns execution state / capacity claims
-  host --> dispatcher : host_start (dispatch-op/1) / execution stop
+  host --> dispatcher : host_start / host_stop (dispatch-op/1)
   dispatcher --> manager : sole privileged start caller / exec.stop / confirmed absence
 
   note bottom of state
@@ -69,12 +69,25 @@ package "SH2+ target - activation gates, not current file layout" {
     unspecified in spec §3.1 / §3.4 / §7.
   end note
   note bottom of home
+    F-16: cross-account child repository has own .git / configuration / hooks.
+    No linked worktree across isolated accounts; same-account board worktrees stay.
     Runner/harness home file ownership and persistent layout:
     unspecified in spec §3.2 / §3.5; not a shared service credential pool.
     Same-machine resume preserves home/profile/runtime/transport,
     transcript digest, exclusive lock, auth and grants.
     Breaking harness semver refuses; resume failure reports resume-failed;
     no automatic fallback (§3.5).
+  end note
+  note bottom of generations
+    R-GEN: fresh random 128-bit generation; restored ledger closes consumers.
+    Host keeps highest observed ledger store epoch; lower epoch refuses pending operator reconciliation.
+    Reader floor only helps outside restored domain; never proves whole-machine rollback absent.
+  end note
+  note bottom of broker
+    R-REBIND: E-rebind / binding replacement keeps same UID + generation;
+    old-binding tombstone; fresh prepare revocation check; never widens.
+    R-TIME: authenticated or operator-controlled time source; dispatcher / broker watermarks.
+    Clock steps only narrow authority; expiry destruction also needs monotonic elapsed lifetime.
   end note
   note bottom of socket
     Kernel peer UID, server identity, close-on-exec, one role/connection.
@@ -85,21 +98,38 @@ package "SH2+ target - activation gates, not current file layout" {
   end note
   note bottom of execution
     Controller epoch, execution ID and account generation are distinct.
-    Durable permit binds logical_session_id, execution_id, controller_epoch, op_id.
+    Session-scoped permit: logical_session_id; owner session lifecycle authorisation.
+    Each start keeps execution_id / controller_epoch / op_id claim and fence.
     Host durable intent and closed fence precede host_start.
-    Fence change withdraws or reconciles permit; host failure retains claim / fence.
+    Fence change withdraws or reconciles affected start authority; host failure retains claim / fence.
     Resolve same ambiguous effect / root receipt; never launch twice.
     Fresh authenticated runner channel / current-epoch registration and readiness
     precede delivery (R-START, §3.3).
     R-MAINT keeps standing allocations / identities; deadline bounds attempt.
     Confirmed absence and reconciliation precede mode/state/binary changes.
-    Unknown/refused stop defers maintenance; restart needs fresh authority.
+    Unknown/refused stop defers maintenance; R-MAINT withdraws permit; restart needs fresh owner admission.
     Live authenticated runner re-adoption keeps execution ID;
     new execution gets new ID. Unknown absence cannot release capacity.
     External record file layouts: unspecified in spec §3.2 / §3.3.
   end note
 }
 
+note bottom of dispatcher
+  R-SESSION: host_stop only by configured host principal for execution under permit.
+  Journaled E-stop / exec.stop / confirmed absence; host-requested, distinct from owner cancel.
+  host_stop confers no start authority.
+  R-FATE: user manager §7 owns process-class fate table beside R-FD3.
+  Survival and service-swap affected set require published unit / per-OS evidence.
+  Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
+  F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
+  Readiness needs verified service row / anchor / resolver restriction (user manager §8).
+  F-15: authenticated controls / observation / already-authorised stop stay reachable
+  while forward admission is closed; unknown records retain claims.
+  R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
+  Late results revalidated under lock; stale results never reopen delivery / admission.
+  Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
 legend bottom
   [[../spec/session-host.md#11-today-fact-at-the-pinned-source Spec §1.1: current state]]
   [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: service state and transport trust]]

@@ -1,0 +1,39 @@
+@startuml
+title M-SH5 - Host wait/lock graph (SH2+ target, R-LOCK)
+left to right direction
+component "Host state / fence lock" as lock
+component "Local journal + record transition\nimmutable intent / durable in-flight marker" as journal
+component "Unlocked per-record in-flight operation\nbounded outbound I/O" as inflight
+component "swarma-dispatcher\nhost_start / host_stop / withdrawal / reconciliation" as dispatcher
+component "swarma-session-runner\nauthenticated input / readiness" as runner
+component "Unlocked result handler" as result
+lock --> journal : held only for local transition
+journal --> inflight : release state lock before call
+inflight --> dispatcher : synchronous wait; no state lock held
+inflight --> runner : synchronous wait; no state lock held
+dispatcher --> result : return / late result; no host state lock held
+runner --> result : return / late result; no host state lock held
+result --> lock : reacquire for fence / epoch / version revalidation
+note bottom of lock
+  Never hold its state lock across a synchronous call to another platform service.
+  Lock-held wait graph: state lock -> local transition only; no remote wait edge.
+  Therefore acyclic. Return/control-flow arrows do not denote lock-held waits.
+  Singleton / process-ownership locks are exempt; do not release them mechanically.
+end note
+note bottom of inflight
+  Ownership tracked by durable per-record in-flight marker, not global lock across I/O.
+  Cancel/fence withdrawal records intent promptly; mid-call withdrawal uses a second
+  unlocked dispatcher call and claim/receipt interlock. Retain possibly executed claims.
+  Fresh authority checks on authority-creating use; intent is not an authority cache.
+  Unrelated records and status / stop remain reachable during a stalled call.
+end note
+note bottom of result
+  Bind call to immutable arguments / record / daemon-instance and controller epochs.
+  Stale result may resolve history; never reopens delivery / admission or cancelled start.
+  Marker schema, bounds and epoch-binding formats would need publication (§7.2).
+end note
+legend bottom
+  [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: R-LOCK and wait/lock graph]]
+  [[../spec/session-host.md#7-open-questions Spec §7: publication / qualification gates]]
+endlegend
+@enduml
