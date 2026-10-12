@@ -36,8 +36,8 @@ package "SH2+ target - disabled until joint activation gates" {
     component "swarma-session-host\ncontroller / input admission" as host
     database "Metadata, logs, transcripts, receipts\nfences, controller epochs, goal revisions\nowner: host" as host_state
   }
-  component "swarma-dispatcher\nadmission / allocation / execution / cleanup" as dispatcher
-  database "Admission, allocation, execution records\nowner: dispatcher" as dispatch_state
+  component "swarma-dispatcher\nUnix-socket service from first slice\nadmission / allocation / execution / cleanup" as dispatcher
+  database "Admission, allocation, execution records\nhost admission permit\nowner: dispatcher" as dispatch_state
   component "swarma-user-manager\nowned generation / exec.stop" as manager
   database "Root-owned active-generation ledger\nowner: user manager" as ledger
   node "User-manager module / root launch boundary" {
@@ -57,11 +57,11 @@ package "SH2+ target - disabled until joint activation gates" {
   bridge --> mail : durable receipt of mail
   bridge --> host : enqueue; count delivery after durable write
   host --> host_state : durable write before acknowledgement
-  host --> dispatcher : start / execution stop request
+  host --> dispatcher : host_start (dispatch-op/1) / execution stop request
   dispatcher --> dispatch_state : admission and cleanup ownership
-  dispatcher --> host : launch ticket issuer
+  dispatcher --> host : admission / effect / receipt evidence
   dispatcher --> manager : exec.stop
-  host --> root_launcher : present launch ticket as authenticated host (I4)
+  dispatcher --> root_launcher : sole privileged start caller; claim / effect / root receipt
   manager --> ledger : owned active generation
   manager --> root_launcher : module's privileged launcher
   root_launcher --> runner : receipt before UID/GID change and exec\nFD3 plan only; no broker descriptor
@@ -79,16 +79,25 @@ package "SH2+ target - disabled until joint activation gates" {
     Standing sessions / executions have no preset lifetime or runtime limit.
     Only explicit stop, operator action or own exit ends the session (§3.5).
     Park and restart preserve it; dispatcher runtime maximum is non-standing only.
+    Durable intent and closed fence precede host_start; permit binds
+    logical_session_id, execution_id, controller_epoch, op_id.
+    Fence change withdraws permit or sends it to reconciliation.
+    Host failure retains dispatcher claim and closed fence.
+    R-MAINT: dispatcher bounded maintenance stop; deadline bounds attempt.
+    Unknown/refused stop defers maintenance; absence and reconciliation
+    precede mode/state/binary changes. Keep standing allocations / identities;
+    fresh restart authority; no live dispatcher adoption or automatic expiry.
   end note
   note bottom of root_launcher
-    Launcher redeems once under user-manager shared lock and journal;
-    redemption, launch intent and receipt are atomic.
-    Ticket signature / schema / host role remain unpublished (I4, §7).
+    Dispatcher starts approved runner through existing claim / effect / root receipt.
+    Cancel before call prevents call; ambiguity resolves same effect / receipt.
+    Stop if required; never launch twice (R-START, §3.3).
     Approved executor path/digest, generation and home checked;
     environment and descriptors reset, atomic start receipt written,
     then groups cleared and GID/UID set.
-    Runner/host channel compatible with FD3-only inheritance:
-    unspecified in spec §7; no extra inherited descriptor assumed.
+    Runner opens fresh authenticated host channel after UID change.
+    Current-epoch registration and readiness precede delivery.
+    Channel / proof formats: unpublished (§7); FD3 plan only.
   end note
   note bottom of broker
     Board runner / host ask dispatcher; they embed no broker client.
@@ -99,7 +108,7 @@ package "SH2+ target - disabled until joint activation gates" {
   end note
   note bottom of manager
     Dispatcher v0 refuses interactive / resume.
-    User-manager v0/v1: sudo caller/role policy.
+    User-manager v0/v1: dispatcher-to-root caller/role policy.
     Caller-bound signed grants: v2 activation gate, grammar unpublished.
     exec.stop proves process absence only; unknown evidence holds capacity.
   end note

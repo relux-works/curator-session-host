@@ -34,11 +34,17 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   note left of Closed
     All effects carry fence / epoch / idempotent op_id rules.
     Operator update lock is distinct; only operator clears it.
+    Prepare durable intent and closed fence before host_start.
+    Fence change withdraws or reconciles host admission permit.
+    Host failure retains dispatcher claim and closed fence.
     Exact per-effect state schema: unspecified in spec §3.4 / §7.
   end note
   note right of Restart
     Preserves standing session; replaces only its execution.
-    exec.stop proves process absence only.
+    host_start backed by durable host admission permit (R-START, §3.3).
+    Dispatcher alone starts runner through claim / effect / root receipt.
+    Fresh authenticated channel, current-epoch registration and readiness
+    precede delivery. exec.stop proves process absence only.
     Fresh runner under agent account checks native-lock absence
     under closed fence and reports to host before harness initialisation / resume.
     Unknown native-lock result keeps session parked (§3.5).
@@ -51,15 +57,22 @@ state "Execution (separate from session)\nrecords / capacity owner: swarma-dispa
   state "Confirmed execution absence" as Absent
   state "Unknown process evidence\ncapacity remains owned" as UnknownExecution
   Live --> Live : controller-only re-adoption keeps execution ID
-  Live --> Stopping : dispatcher stop request
+  Live --> Stopping : dispatcher stop / operator maintenance stop (R-MAINT)
   Live --> Absent : own exit; durable exit receipt and confirmed absence (§3.2, §3.5)
   Stopping --> Absent : owned generation / receipt / process checked; TERM then KILL; absence confirmed
   Stopping --> UnknownExecution : absence cannot be confirmed
   UnknownExecution --> Live : confirmed live authenticated runner (§3.2)
   UnknownExecution --> Absent : confirmed absence (§3.2)
-  Absent --> Live : separately admitted new exec; new execution ID / readiness
+  Absent --> Live : fresh authority; host_start; new execution ID / current-epoch registration / readiness
   note right of Absent
     Standing executions have no preset runtime maximum.
+    R-MAINT (§3.5 / dispatcher §11): close admission; inventory;
+    stop selected executions with explicit operator authority via exec.stop.
+    Deadline bounds maintenance attempt, never session / execution lifetime.
+    Unknown/refused stop or incomplete reconciliation defers maintenance.
+    Absence and reconciliation precede mode/state/binary changes;
+    keep standing allocations / identities; restart needs fresh authority.
+    No live dispatcher adoption or automatic expiry.
     Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
     Only confirmed absence permits release / replacement / cleanup.
     Exit receipts are durable and replayable.

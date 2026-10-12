@@ -26,8 +26,22 @@ The standing-session lifetime decision of 2026-10-12 is reflected in M-SH1,
 M-SH2 and the M-SH3 session/execution/wake view: no preset lifetime or runtime
 limit; only explicit stop, operator action or own exit ends the session.
 Park and controlled restart preserve it. The dispatcher's 12-hour maximum is
-for non-standing executions only. Liveness deadlines and ticket, capability
-or approval expiry do not impose a standing-session lifetime.
+for non-standing executions only. Liveness deadlines and capability or approval
+expiry do not impose a standing-session lifetime. R-MAINT in those views references
+the dispatcher's bounded maintenance stop: the deadline bounds the attempt;
+confirmed absence and reconciliation precede mode/state/binary changes. Unknown
+or refused stop defers maintenance, allocations and identities stay, and restart
+needs fresh authority; no live dispatcher adoption or automatic expiry.
+
+R-START is reflected in the M-SH1 ownership/components, M-SH2 recovery, M-SH3
+lifecycle and M-SH4 storage views: durable host intent and closed fence before
+`host_start` in `dispatch-op/1`, a dispatcher-owned host admission permit bound
+to `(logical_session_id, execution_id, controller_epoch, op_id)`, and the dispatcher
+as the sole privileged start caller. Fence changes withdraw or reconcile the
+permit; host failure retains the claim and closed fence. The fresh runner opens
+an authenticated channel; current-epoch registration and readiness precede delivery.
+Dispatcher service transport is Unix-socket from its first slice (F-5). Joint
+formats and crash ordering remain publication/qualification gates (§7).
 
 Sources use basic PlantUML declarations, notes, links and control flow without
 remote includes or themes. Rendering has not been performed on the development

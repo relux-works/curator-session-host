@@ -33,7 +33,7 @@ package "SH2+ target - activation gates, not current file layout" {
     artifact "Managed home / native-session lock\ncontinuity binding: home, profile, transcript digest" as home
   }
   component "swarma-dispatcher" as dispatcher
-  database "Admission / allocation / execution / cleanup records\nowner: dispatcher" as execution
+  database "Admission / allocation / execution / cleanup records\nhost admission permit\nowner: dispatcher" as execution
   component "swarma-user-manager / swarma-user-launcher\nroot launch / exec.stop boundary" as manager
   database "Root-owned active-generation ledger\nowner: user manager" as generations
   component "Optional board client\norchestrator account / service account" as board
@@ -55,7 +55,8 @@ package "SH2+ target - activation gates, not current file layout" {
   host --> generations : check UID / active generation
   manager --> generations : owns privileged ledger
   dispatcher --> execution : owns execution state / capacity claims
-  dispatcher --> manager : owned execution stop / confirmed absence
+  host --> dispatcher : host_start (dispatch-op/1) / execution stop
+  dispatcher --> manager : sole privileged start caller / exec.stop / confirmed absence
 
   note bottom of state
     Agent-writable files are not trusted transcript/audit evidence.
@@ -83,7 +84,16 @@ package "SH2+ target - activation gates, not current file layout" {
     unspecified in spec §3.1 / §7.
   end note
   note bottom of execution
-    Controller epoch is not ticket epoch or account generation.
+    Controller epoch, execution ID and account generation are distinct.
+    Durable permit binds logical_session_id, execution_id, controller_epoch, op_id.
+    Host durable intent and closed fence precede host_start.
+    Fence change withdraws or reconciles permit; host failure retains claim / fence.
+    Resolve same ambiguous effect / root receipt; never launch twice.
+    Fresh authenticated runner channel / current-epoch registration and readiness
+    precede delivery (R-START, §3.3).
+    R-MAINT keeps standing allocations / identities; deadline bounds attempt.
+    Confirmed absence and reconciliation precede mode/state/binary changes.
+    Unknown/refused stop defers maintenance; restart needs fresh authority.
     Live authenticated runner re-adoption keeps execution ID;
     new execution gets new ID. Unknown absence cannot release capacity.
     External record file layouts: unspecified in spec §3.2 / §3.3.

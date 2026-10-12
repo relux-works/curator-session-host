@@ -11,8 +11,9 @@ participant "Harness / private Codex app-server\nworker-<label>" as Harness
 participant "swarma-credential-broker\nCodex auth-owner refresh" as Broker
 
 note over Host,Broker
-  Target only: joint ticket / host-role / runner-channel activation (I4, §3.3, §7).
-  Ticket signature, schema and host role remain unpublished.
+  Target only: joint host_start / host admission permit / runner-channel activation.
+  Wire / proof formats and durable crash ordering remain unpublished (§3.3, §7).
+  Dispatcher is a Unix-socket service from first slice (F-5); readiness before admission.
   Dispatcher v0 refuses interactive/resume; user-manager signed grants are v2.
   Current / SH1: tb-sessiond owns PTY/app-server; Claude dies on replacement.
 end note
@@ -26,7 +27,7 @@ alt Live authenticated runner confirmed
   Host -> State : verified controller-only re-adoption under current epoch
   note over Host,Runner
     Keep execution ID; rotate execution-scoped authority on replacement.
-    Account generation, execution ID, ticket epoch and controller epoch are distinct.
+    Account generation, execution ID and controller epoch are distinct.
     Reconnect channel and wire: unspecified in spec §7.
     FD3 carries only plan; no extra inherited descriptor assumed.
   end note
@@ -44,6 +45,11 @@ note over Host,Runner
   Only explicit stop, operator action (including emergency stop) or own exit ends a session.
   Park and controlled restart preserve the session; restart replaces only its execution.
   Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
+  R-MAINT / dispatcher §11: close admission, inventory, operator-authorised exec.stop.
+  Maintenance deadline bounds attempt, never session / execution lifetime.
+  Require confirmed absence and reconciliation before mode/state/binary changes.
+  Unknown/refused stop defers maintenance; keep standing allocations / identities.
+  Restart needs fresh authority; no live dispatcher adoption or automatic expiry.
 end note
 Caller -> Host : authorised restart / explicit recovery
 Host -> State : hold delivery closed; invalidate pending interactions
@@ -73,17 +79,20 @@ else Process absence confirmed
       exclusive native lock, ready auth and current grants; preserve transport.
       Unsupported recovery rows stay visibly parked or refused.
     end note
-    Host -> Dispatcher : newly admitted execution; new execution ID
-    Dispatcher --> Host : ticket bound to generation, execution, ticket epoch, executor, plan digest, expiry
-    Host -> Launcher : present ticket as authenticated host
-    Launcher -> Launcher : validate ticket and live claim under user-manager shared lock
-    alt Wrong principal / replay / altered plan or executor / expired or revoked claim
-      Launcher --> Host : refuse; no new start
-    else Valid ticket and live claim
-      Launcher -> Launcher : validate generation, executor and home; reset environment/descriptors
-      Launcher -> Launcher : redeem once under module's shared lock and journal\natomically with launch intent / start receipt
+    Host -> State : prepare durable session intent / closed delivery fence; new execution ID
+    Host -> Dispatcher : admit session-host executor start
+    Dispatcher -> Dispatcher : create durable host admission permit bound to\nlogical_session_id, execution_id, controller_epoch, op_id
+    Host -> Dispatcher : host_start (dispatch-op/1) with the four bound values / permit
+    alt Wrong principal / mismatched binding / altered plan or executor / cancelled claim / withdrawn or unresolved permit
+      Dispatcher --> Host : refuse or reconcile; no new start
+      Host -> State : keep delivery closed
+    else Current admitted claim and host admission permit
+      Dispatcher -> Launcher : sole privileged start caller; existing claim / effect path
+      Launcher -> Launcher : validate generation, executor and home; reset environment/descriptors\nexisting launch intent / atomic root start receipt
       Launcher -> Launcher : clear groups; set GID/UID
       Launcher -> Runner : exec approved runner; FD3 immutable plan only
+      Runner -> Host : open fresh authenticated channel after UID change
+      Runner -> Host : register admitted execution in current controller epoch
       Runner -> Runner : check harness native-lock absence under agent account / closed fence
       Runner --> Host : native-lock check result (report format unpublished)
       alt Native-lock result unknown
@@ -102,7 +111,7 @@ else Process absence confirmed
           Runner --> Host : unknown readiness / authentication not ready
           Host -> State : park; keep delivery closed
         else Admitted readiness reported
-          Runner --> Host : readiness / replayable start and readiness receipts
+          Runner --> Host : readiness after current-epoch registration / replayable start and readiness receipts
           Host -> State : reconcile dispatched input marker against intact transcript
           alt Matching marker
             Host -> State : receipt applied; no duplicate delivery
@@ -122,13 +131,15 @@ else Process absence confirmed
 end
 
 note over Host,Launcher
-  Lost launch reply: resolve same effect ID and receipt, never a second start.
-  Cancel/redemption interlock, signature bytes and acknowledgement-crash protocol:
-  unspecified in spec §3.3 / §7; publish and test before activation.
+  Cancel before privileged call prevents call. After ambiguity, dispatcher resolves
+  same effect ID and root receipt, stopping execution if required; never launch twice.
+  Fence change withdraws host admission permit or sends it to reconciliation.
+  Host failure retains dispatcher claim and closed fence until reconciliation.
+  Wire / proof formats and acknowledgement-crash ordering: unpublished (§7).
 end note
 legend bottom
   [[../spec/session-host.md#32-holders-under-agent-accounts-and-the-process-tree Spec §3.2: reconnect, receipts and confirmed absence]]
-  [[../spec/session-host.md#33-backend-activation-with-the-dispatcher-and-the-user-manager Spec §3.3: ticket and epoch gates]]
+  [[../spec/session-host.md#33-backend-activation-with-the-dispatcher-and-the-user-manager Spec §3.3: host_start, permit and epoch gates]]
   [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: reconciliation]]
   [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: restart and D-RESUME]]
 endlegend
