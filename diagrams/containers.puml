@@ -76,6 +76,9 @@ package "SH2+ target - disabled until joint activation gates" {
     Closed fence queues without delivery; unknown readiness parks.
     Controller failure: reconcile before input; live runner may be
     re-adopted with same execution ID. Replacement requires confirmed absence.
+    Standing sessions / executions have no preset lifetime or runtime limit.
+    Only explicit stop, operator action or own exit ends the session (§3.5).
+    Park and restart preserve it; dispatcher runtime maximum is non-standing only.
   end note
   note bottom of root_launcher
     Launcher redeems once under user-manager shared lock and journal;

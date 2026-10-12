@@ -15,6 +15,8 @@ In the gated SH2+ launch path, the dispatcher issues a ticket, the host presents
 
 Same-machine native resume trusts non-breaking harness semver changes: the same major, and for 0.x the same minor, with the continuity preconditions in spec §3.5. A different major or 0.x minor is refused. A harness resume failure is reported as `resume-failed` to the caller, which decides the next action; there is no automatic fallback or portable seed on this path.
 
+For SH2+, the owner decision of 2026-10-12 gives standing sessions (the orchestrator and standing team members) and their executions no preset lifetime or runtime limit. Only an explicit stop, operator action (including emergency stop) or its own exit ends a standing session. Park and controlled restart preserve the session; restart replaces its execution. The dispatcher's 12-hour runtime maximum applies only to non-standing executions. See spec §3.5 and §3.7; the runtime-policy wire format remains unpublished.
+
 Related modules: [swarma-dispatcher](https://github.com/relux-works/swarma-dispatcher), [swarma-user-manager](https://github.com/relux-works/swarma-user-manager), [swarma-credential-broker](https://github.com/relux-works/swarma-credential-broker), [curator-agent-launcher](https://github.com/relux-works/curator-agent-launcher) (`curator-run`), [agent-session-bridge](https://github.com/relux-works/agent-session-bridge).
 
 The generic SH1 gate tools and invented fixture are documented in

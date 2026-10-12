@@ -6,7 +6,7 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   state "Delivery open" as Open
   state "Fence closed\nqueue without delivery" as Closed
   state "Parked (durable)" as Parked
-  state "Explicitly stopped" as Stopped
+  state "Stopped by explicit stop / operator action" as Stopped
   state "Controller reconciliation" as Reconcile
   state "Controlled restart\nonly fence-holding operation" as Restart
   Open --> Parked : authorised park / unknown readiness / needs re-authentication
@@ -21,7 +21,7 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   Restart --> Parked : unsupported recovery row / unknown readiness / unknown native-lock result
   Restart --> Closed : unknown process absence or delivery outcome
   Restart --> Open : process absence; admitted fresh runner confirms native-lock absence; readiness and reconciliation
-  Open --> Stopped : explicit stop (§3.4)
+  Open --> Stopped : explicit stop / operator action, including emergency stop (§3.5)
   note right of Parked
     No wake of parked or stopped sessions.
     Goal-free park has no board barrier.
@@ -37,6 +37,7 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
     Exact per-effect state schema: unspecified in spec §3.4 / §7.
   end note
   note right of Restart
+    Preserves standing session; replaces only its execution.
     exec.stop proves process absence only.
     Fresh runner under agent account checks native-lock absence
     under closed fence and reports to host before harness initialisation / resume.
@@ -51,12 +52,15 @@ state "Execution (separate from session)\nrecords / capacity owner: swarma-dispa
   state "Unknown process evidence\ncapacity remains owned" as UnknownExecution
   Live --> Live : controller-only re-adoption keeps execution ID
   Live --> Stopping : dispatcher stop request
+  Live --> Absent : own exit; durable exit receipt and confirmed absence (§3.2, §3.5)
   Stopping --> Absent : owned generation / receipt / process checked; TERM then KILL; absence confirmed
   Stopping --> UnknownExecution : absence cannot be confirmed
   UnknownExecution --> Live : confirmed live authenticated runner (§3.2)
   UnknownExecution --> Absent : confirmed absence (§3.2)
   Absent --> Live : separately admitted new exec; new execution ID / readiness
   note right of Absent
+    Standing executions have no preset runtime maximum.
+    Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
     Only confirmed absence permits release / replacement / cleanup.
     Exit receipts are durable and replayable.
     Exit never satisfies optional board wait (§3.5).
@@ -80,6 +84,7 @@ state "Wake / mail view\nbridge Mailbox and host inbox are distinct durable owne
     No stale-session wake; no agent self-rearming / model wait.
     Runner reports boundary / idleness / heartbeat via readiness grammar.
     Unknown readiness parks (§3.7).
+    Liveness deadline detects a wedge; it is not standing-session expiry.
     Deadline values / queue lifecycle details: unspecified in spec §3.7.
     Nudge / wake budget source, setter and default without board:
     unspecified in spec §3.8 / §7.
@@ -124,6 +129,9 @@ state "Optional board waiting / terminal view\nowner: board/orchestrator, initia
 
 note bottom of Session
   Views are conceptual, not newly specified wire enums or a combined FSM.
+  Standing sessions have no preset lifetime / runtime limit (§3.5).
+  They end only by explicit stop, operator action or own exit.
+  Park and controlled restart do not end them.
   Emergency stop: operator authority, bound-board snapshot if any,
   fence and absence receipts, explicit recovery (§3.5).
   Current / SH1 preserves tb-sessiond-owned transports and attached-client notices;

@@ -63,6 +63,9 @@ note bottom of engine
   Recovery: no runner input before reconciliation; live authenticated runner
   re-adoption retains execution ID, new exec gets new ID (§3.2).
   Explicit stop stays stopped; park is durable; restart owns its fence (§3.5).
+  Standing sessions / executions have no preset lifetime or runtime limit.
+  Only explicit stop, operator action or own exit ends the session.
+  Park and restart preserve it; dispatcher runtime maximum is non-standing only.
   Internal APIs / engine classes: unspecified in spec §3.
 end note
 note bottom of adapters

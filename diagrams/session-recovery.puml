@@ -38,7 +38,13 @@ else Unknown or unreadable execution evidence
 end
 
 == Separate scenario: authorised controlled restart (§3.5), only fence holder ==
-note over Host,Runner : Controller-only re-adoption above does not itself require an execution restart.
+note over Host,Runner
+  Controller-only re-adoption above does not itself require an execution restart.
+  Standing sessions / executions have no preset lifetime or runtime limit.
+  Only explicit stop, operator action (including emergency stop) or own exit ends a session.
+  Park and controlled restart preserve the session; restart replaces only its execution.
+  Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
+end note
 Caller -> Host : authorised restart / explicit recovery
 Host -> State : hold delivery closed; invalidate pending interactions
 Host -> Runner : drain external effects and child tools

@@ -22,6 +22,13 @@ FD3/reconnect shorthand: lane 1 is public hosted CI with a private pinned board
 checkout; FD3 carries the plan only, and the authenticated runner/host channel
 remains an activation gate. No extra inherited descriptor is drawn.
 
+The standing-session lifetime decision of 2026-10-12 is reflected in M-SH1,
+M-SH2 and the M-SH3 session/execution/wake view: no preset lifetime or runtime
+limit; only explicit stop, operator action or own exit ends the session.
+Park and controlled restart preserve it. The dispatcher's 12-hour maximum is
+for non-standing executions only. Liveness deadlines and ticket, capability
+or approval expiry do not impose a standing-session lifetime.
+
 Sources use basic PlantUML declarations, notes, links and control flow without
 remote includes or themes. Rendering has not been performed on the development
 host; no tests or builds run here. The configured Change Request validation runs
