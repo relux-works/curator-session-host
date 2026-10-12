@@ -26,7 +26,7 @@ component "swarma-session-runner\nworker-<label>; one per session\nPTY master / 
 component "Claude Code / Codex private app-server\nworker-<label>; provider harness process" as harness
 
 caller --> board_state : optional board transactions
-caller --> admission : generic optional goal / session calls
+caller --> admission : generic optional goal / session calls; goal interface unpublished
 bridge --> mailbox : durable mail ownership
 bridge --> admission : enqueue; durable host write before acknowledgement
 admission --> generations : verify active managed generation
@@ -79,6 +79,13 @@ note bottom of approval
   Restart invalidates historical approval; fence invalidates pending interaction.
   Receipt / approval and optional goal wire/state schemas:
   unspecified in spec §7; publication is an activation gate.
+end note
+note bottom of goals
+  Host-socket goal actions / capability shape: unpublished (§3.8 / §7).
+  Per-session nudge / wake budget source and default without board: unspecified.
+  No specified agent "done" proposal path without board.
+  With board, outcome only proposes to board owner.
+  D-GOALS: agent has no goal capability; future proposal must not mutate goal.
 end note
 
 legend bottom

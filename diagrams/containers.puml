@@ -40,7 +40,7 @@ package "SH2+ target - disabled until joint activation gates" {
   database "Admission, allocation, execution records\nowner: dispatcher" as dispatch_state
   component "swarma-user-manager\nowned generation / exec.stop" as manager
   database "Root-owned active-generation ledger\nowner: user manager" as ledger
-  node "Root launch boundary" {
+  node "User-manager module / root launch boundary" {
     component "swarma-user-launcher" as root_launcher
   }
   node "worker-<label> agent account - one runner per session" {
@@ -61,9 +61,9 @@ package "SH2+ target - disabled until joint activation gates" {
   dispatcher --> dispatch_state : admission and cleanup ownership
   dispatcher --> host : launch ticket issuer
   dispatcher --> manager : exec.stop
-  host --> manager : one-time ticket redemption as authenticated host
+  host --> root_launcher : present launch ticket as authenticated host (I4)
   manager --> ledger : owned active generation
-  manager --> root_launcher : privileged launch boundary
+  manager --> root_launcher : module's privileged launcher
   root_launcher --> runner : receipt before UID/GID change and exec\nFD3 plan only; no broker descriptor
   runner <--> host : authenticated reconnect / readiness / current epoch input
   runner --> harness : owns PTY master
@@ -78,6 +78,9 @@ package "SH2+ target - disabled until joint activation gates" {
     re-adopted with same execution ID. Replacement requires confirmed absence.
   end note
   note bottom of root_launcher
+    Launcher redeems once under user-manager shared lock and journal;
+    redemption, launch intent and receipt are atomic.
+    Ticket signature / schema / host role remain unpublished (I4, §7).
     Approved executor path/digest, generation and home checked;
     environment and descriptors reset, atomic start receipt written,
     then groups cleared and GID/UID set.
@@ -95,7 +98,13 @@ package "SH2+ target - disabled until joint activation gates" {
     Dispatcher v0 refuses interactive / resume.
     User-manager v0/v1: sudo caller/role policy.
     Caller-bound signed grants: v2 activation gate, grammar unpublished.
-    Stop confirms owned execution absence; unknown evidence holds capacity.
+    exec.stop proves process absence only; unknown evidence holds capacity.
+  end note
+  note bottom of runner
+    On restart, fresh runner checks native-lock absence under agent account
+    and closed host fence before harness initialisation / resume;
+    reports to host. Unknown result keeps session parked (§3.5).
+    Agent has no goal capability; proposal must not mutate a goal (D-GOALS).
   end note
 }
 

@@ -18,9 +18,9 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   Open --> Restart : authorised restart; close fence / drain
   Parked --> Restart : explicit recovery (§3.5)
   Stopped --> Restart : explicit recovery; no automatic restart
-  Restart --> Parked : unsupported recovery row / unknown readiness
-  Restart --> Closed : unknown absence or delivery outcome
-  Restart --> Open : confirmed absence, admitted new execution, readiness and reconciliation
+  Restart --> Parked : unsupported recovery row / unknown readiness / unknown native-lock result
+  Restart --> Closed : unknown process absence or delivery outcome
+  Restart --> Open : process absence; admitted fresh runner confirms native-lock absence; readiness and reconciliation
   Open --> Stopped : explicit stop (§3.4)
   note right of Parked
     No wake of parked or stopped sessions.
@@ -35,6 +35,12 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
     All effects carry fence / epoch / idempotent op_id rules.
     Operator update lock is distinct; only operator clears it.
     Exact per-effect state schema: unspecified in spec §3.4 / §7.
+  end note
+  note right of Restart
+    exec.stop proves process absence only.
+    Fresh runner under agent account checks native-lock absence
+    under closed fence and reports to host before harness initialisation / resume.
+    Unknown native-lock result keeps session parked (§3.5).
   end note
 }
 
@@ -75,6 +81,8 @@ state "Wake / mail view\nbridge Mailbox and host inbox are distinct durable owne
     Runner reports boundary / idleness / heartbeat via readiness grammar.
     Unknown readiness parks (§3.7).
     Deadline values / queue lifecycle details: unspecified in spec §3.7.
+    Nudge / wake budget source, setter and default without board:
+    unspecified in spec §3.8 / §7.
   end note
 }
 
@@ -94,7 +102,10 @@ state "Optional goal command / acknowledgement\nrevision owner: host; board ledg
     actions, audience, expiry, revocation and open fence required.
     Wrong authority / stale epoch / revoked capability: refuse.
     Agent account has no goal capability (D-GOALS).
-    Goal wire / ack schema: unspecified in spec §7.
+    Host-socket goal actions / capability shape and goal wire / ack:
+    unpublished in spec §3.8 / §7.
+    No specified agent "done" proposal path without board;
+    any future proposal must not mutate a goal (D-GOALS).
     NoGoal does not gate any session operation (§3.8).
   end note
 }
@@ -105,6 +116,7 @@ state "Optional board waiting / terminal view\nowner: board/orchestrator, initia
   note right of Wait
     Execution exit and goal acknowledgement do not imply board completion.
     Ledger / ancestry / outcomes / publication belong to board adapter.
+    Agent outcome only proposes to board owner; it does not mutate a goal.
     Board state names, transition conditions and terminal enum:
     unspecified in spec §2.2 / §3.5 / §3.8; no transitions invented here.
   end note
