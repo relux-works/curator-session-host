@@ -11,12 +11,23 @@ participant "Trusted reviewer\ndistinct from producer" as Reviewer
 participant "Isolated ephemeral verification runner\nanother machine; no secrets" as Verify
 
 Caller -> Dispatcher : admitted exact base B canonical archive + task snapshot / write scope / exec profile
-Dispatcher -> Dispatcher : journal archive digest; plan covers B / file-manifest digest / write scope / profile
+Dispatcher -> Dispatcher : journal archive digest; pin B / mode-content manifest / scope / exporter digest / caps
+Dispatcher -> Dispatcher : resolve protected exec-policy identity / body digest at prepare; caller text is not authority
+note over Dispatcher,Workspace
+  Original admission consents to bounded cleanup export after ordinary expiry.
+  No harness / lease / network / task / repair / R-SESSION successor authority.
+  Security holds require explicit disposition; never launch in retiring generation.
+  Materialize / work / export: distinct claims, launch-stop effects, root receipts and absence.
+  Bounded cleanup capacity and storage accounting; lost replies reconcile original evidence.
+end note
 Dispatcher -> Workspace : materialize before work as child UID
 Workspace -> Worker : fresh standalone repository; local config; no hooks / remotes / credential helpers
 note over Workspace,Worker
   No linked Git administration across accounts; worker Git history never consumed.
+  Machine-selected exec-policy body pin verified before launch / retry; drift refuses.
   OS exec allowlist; writable areas non-executable; only qualified light checks.
+  Full invocation and interpreted inputs qualified; worker bytes stay inert locally.
+  Direct / indirect heavy forms refuse; unprovable local tools route to R-VERIFY.
   No builds / tests / self-started agent loop; admitted executor alone starts trusted harness.
   Workplace has zero egress and donor loop only; local trusted provider-only proxy.
   Web default-off; explicit trusted-circle opt-in only.
@@ -36,34 +47,71 @@ else Absence confirmed
   opt Workplace round
     ProjectExec -> ProjectExec : write-fence round; refuse further tool calls into workspace
   end
-  Dispatcher -> Workspace : export as child UID, fixed environment, no network
-  Workspace -> Workspace : no link following / skip .git; compare admitted manifest; enforce whole-export refusals / caps
-  Workspace --> Dispatcher : changes only; no worker commits
-  Dispatcher -> Dispatcher : journal digests / export cleanup obligation
-  Dispatcher --> Caller : swarma-dispatcher workspace-result/1; original caller only
-  Caller -> Board : result resource; deterministic import on B, scratch index, no hooks / filters / drivers
-  Board -> Board : refuse .git / outside write scope / .task-board; flag sensitive paths and symlinks
-  Board --> Caller : signed repository candidate C; worker / run / digest trailers; recomputable tree
-  Caller -> Reviewer : review exactly C; K1 acceptance never transfers by patch equality
-  Caller -> Verify : controlled verification job; dependency egress (R-NET-TOOL)
-  Verify --> Board : results as data, testing state; tester reads / orchestrates only
-  alt Changes requested
-    Reviewer -> Board : findings for candidate C
-    Caller -> Dispatcher : new admitted base C + findings in local task snapshot, or remote signed task letter
-    note over Caller,Worker
-      Materialize afresh; remote donor session continues.
-      Remove previous workspace only after recorded export.
-      Next export yields C2 on C; not an unchanged-plan R-SESSION restart.
-    end note
-  else Accepted exact head
-    Reviewer -> Board : acceptance bound to exact candidate; explicit flagged-hunk acknowledgements
-    Caller -> Board : signed fast-forward integration K1/K3; moved base requires refresh / re-review
+  Dispatcher -> Workspace : distinct admitted cleanup export as child UID; fixed environment / no network
+  Workspace -> Workspace : compare kind/mode + content without links; deletions use prior mode; stop at first cap excess
+  alt Interrupted / unknown export or infrastructure failure
+    Dispatcher -> Dispatcher : retain pending effect / obligation / home; no partial result
+  else Deterministic policy refusal or qualified source-permission failure
+    Workspace --> Dispatcher : immutable whole refusal / typed failure evidence; no partial change set
+    Dispatcher -> Dispatcher : retain obligation / home / UID / live-allocation claim
+    Dispatcher --> Caller : authenticated refusal class / blocked path only; format remains owner publication work
+    alt Current authority and plan-bounded repair budget remain
+      Caller -> Dispatcher : separately admit same-workspace repair round; valid edits retained
+      Dispatcher -> Worker : linked repair execution / task snapshot or letter; reopen fences for repair only
+      note over Dispatcher,ProjectExec
+        New fenced round / new linked export effect after account-wide absence.
+        Workplace write and ingress fences close through quiescence / export.
+        Terminal refusal is immutable; repaired export is whole, never partial success.
+      end note
+    else Budget spent or work authority invalid
+      Dispatcher -> Dispatcher : retain obligation pending per-act operator waiver
+      note over Dispatcher
+        Standing discard is unchosen and off; repair is not cleanup-only authority.
+        No candidate C from refusal; after authorised disposition, a new admitted round
+        may start from the last admitted base. Authorised discard requires a per-act waiver.
+      end note
+    end
+  else Whole recorded export
+    Workspace --> Dispatcher : changed content / executable bits / symlink text / deletion prior mode
+    Dispatcher -> Dispatcher : verify result and every blob digest / size; durable custody outside home deletion
+    alt Missing / corrupt blob or incomplete durability receipt
+      Dispatcher -> Dispatcher : retain obligation; no deletion or candidate handoff
+    else Journaled complete-content receipt
+      Dispatcher -> Dispatcher : discharge obligation; home may retire before import
+      Dispatcher --> Caller : authenticated workspace-result/1; DRAFT object, transport / retention gated
+      note over Dispatcher,Board
+        Retain content with bounded accounting until authenticated import acknowledgement
+        or explicit authorised release; archived authority cannot release to revoked caller.
+        Re-observation uses a new linked effect; never replaces a terminal receipt.
+        Contradiction: outcome class or recorded change-set digest, not refusal diagnostics.
+      end note
+      Caller -> Board : result resource; deterministic import on B, scratch index, no hooks / filters / drivers
+      Board -> Board : refuse .git / outside write scope / .task-board; flag sensitive paths and symlinks
+      Board --> Caller : signed repository candidate C; worker / run / digest trailers; recomputable tree
+      Caller -> Reviewer : review exactly C; K1 acceptance never transfers by patch equality
+      Caller -> Verify : controlled verification job; dependency egress (R-NET-TOOL)
+      Verify --> Board : results as data, testing state; tester reads / orchestrates only
+      alt Changes requested
+        Reviewer -> Board : findings for candidate C
+        Caller -> Dispatcher : new admitted base C + findings in local task snapshot, or remote signed task letter
+        note over Caller,Worker
+          Materialize afresh; remote donor session continues.
+          Remove previous workspace only after complete-content export receipt or operator waiver.
+          Next export yields C2 on C; not an unchanged-plan R-SESSION restart.
+        end note
+      else Accepted exact head
+        Reviewer -> Board : acceptance bound to exact candidate; explicit flagged-hunk acknowledgements
+        Caller -> Board : signed fast-forward integration K1/K3; moved base requires refresh / re-review
+      end
+    end
   end
 end
 note over Dispatcher,Board
   Export precedes retirement / home deletion unless operator explicitly waives obligation.
   Host adds no transfer authority. No untrusted candidate sent to secret-bearing CI before acceptance.
-  Archive / exact plan / export caps / result schema + retention / import command unpublished (§7.13).
+  Result fields / schema DRAFT at dispatcher §5.2.1; no new result fields.
+  Archive / manifest encoding / intake / caps / cleanup-repair authority / blob custody /
+  transport + retention / import command remain publication gates (§7.13).
   Verification pool / job / result format unpublished (§7.17).
 end note
 legend bottom

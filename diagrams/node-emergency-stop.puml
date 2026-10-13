@@ -18,27 +18,63 @@ note over Operator,Control
   Refuse acts from agent sessions; observer account permits read-only status.
   Binary / wire / signature domain / canonical bytes unpublished (§7.16).
 end note
-Dispatcher -> Dispatcher : journal hold; close admission
 note over Control,Boards
-  Each service journals its own part; arrows do not publish a coordination wire or crash order.
-  Same operator act / service responsibilities only; act format unpublished.
-  No coordination topology or coordinator is selected or implied.
+  Direct fan-out of same signed act / identity / canonical bytes to each intake.
+  Every receiver verifies and journals its part idempotently; no service relay dependency.
+  Per-service results / retries; undeliverable parts stay unknown.
 end note
-Manager -> Manager : deny-all agent / workplace UID range (R-RANGE-DENY)
-Manager -> Manager : journal stop of every generation; account-wide scope / confirmed absence
-Broker -> Broker : freeze all leases and renewals
-note over Broker : Tokens already delivered retain vendor lifetime.
-Host -> Host : close delivery for every session
-Host -> State : journal closed delivery fences; invalidate pending interactions
-Host -> Boards : snapshot bound boards; no board required for goal-free session
-alt Every required stop / snapshot / journal result known and absence confirmed
+par Dispatcher part at act admission
+  Control -> Dispatcher : same act; set journaled hold without waiting for service calls
+  alt Dispatcher available with valid state
+    Dispatcher -> Dispatcher : commit hold / suspend session lifecycle permits
+  else Dispatcher absent / crash-looping / mid-swap
+    Control -> Control : dispatcher part unknown; reconcile when available
+    note over Control,Dispatcher : No offline writer of dispatcher state; no whole-act success inferred.
+  end
+else Prompt independent range and receiver fence
+  Control -> Manager : same act; journal range deny-all and root-owned all-stop mark
+  Manager -> Manager : close launch / create / activation under generation exclusion before inventory
+  note over Manager
+    Refuse already-issued starts, materializers and exporters.
+    Closed inventory frontier required before absence can become final.
+  end note
+else Prompt independent credential cut
+  Control -> Broker : same act; journal freeze of all leases and renewals
+  note over Broker : Tokens already delivered retain vendor lifetime.
+else Prompt independent host cut
+  Control -> Host : same act; close delivery for every session
+  Host -> State : journal closed delivery fences; invalidate pending interactions
+  Host -> Boards : snapshot bound boards; no board required for goal-free session
+end
+note over Control,Manager
+  Stops begin after containment is issued; never wait for containment replies.
+  Bounded parallelism; terminal operator-helper path can initiate without dispatcher.
+  Phone-to-helper transition remains publication work (§7.16).
+end note
+alt Dispatcher available
+  Dispatcher -> Manager : initiate journaled generation stops under act
+else Dispatcher unavailable
+  Control -> Manager : operator-helper initiation of generation stops under act
+end
+Manager -> Manager : journal termination; account-wide scope / confirmed absence behind receiver fence
+Manager --> Control : per-generation stop evidence; unknown never releases claims
+opt Dispatcher returns
+  Control -> Dispatcher : retry act / reconcile operator-stopped evidence
+  Dispatcher -> Dispatcher : commit own part; release claims only on confirmed absence; no relaunch
+end
+alt Every durable service part / snapshot known and fenced absence confirmed
   Host -> State : record confirmed absence; keep stopped pending explicit recovery
-else Partial / unknown result or absence unconfirmed
+else Partial / unknown part or absence unconfirmed
   Host -> State : retain fences and claims
-  Dispatcher -> Dispatcher : keep admission closed
+  Control -> Control : report unknown; no whole-act success or recovery
 end
 note over Dispatcher,Host
-  Recovery is explicit, never automatic restart.
+  Broker reply unavailable does not delay valid helper stop progress.
+  Dispatcher-unavailable progress and never-launched-generation coverage
+  are distinct acceptance cases, even if one fence covers both.
+  Content-confirmed recovery names stopped set / per-session restart scope.
+  Valid owner lifecycle authority or fresh admission still required; no automatic restart.
+  Every independent closure gate must clear; no unknown part permits reopening.
   R-LOCK: host holds state lock for local journal transitions only;
   board / dispatcher waits happen without the host state lock.
   R-WATCH never invokes this node-wide act automatically.

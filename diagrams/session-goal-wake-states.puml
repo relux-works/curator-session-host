@@ -173,11 +173,15 @@ note bottom of Execution
   Survival and service-swap affected set require published unit / per-OS evidence.
   Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
   F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
-  R-WATCH: watcher requests per-account egress freeze and journaled dispatcher exec.stop.
+  R-WATCH v0: journaled dispatcher exec.stop; affected-session hold / status-only observer reads.
+  No v0 per-account egress freeze or phone alert; v1 freeze lifecycle remains open.
   Host parks or ends with durable reason; unknown absence keeps fence / claims.
   R-ALLSTOP: manual operator act closes every session delivery and snapshots bound boards.
   Dispatcher hold; range deny-all; stop every generation; freeze leases / renewals.
-  Delivered tokens keep vendor lifetime; each service journals; unknown keeps admission closed.
+  Delivered tokens keep vendor lifetime; direct same-act fan-out / per-service journals.
+  Prompt independent cuts; receiver launch/create/activation fence before absence scan.
+  Operator-helper stops progress without dispatcher; every durable part required before recovery.
+  Unknown keeps admission closed; recovery names stopped set / restart scope / owner authority.
   Keep fences until confirmed absence; explicit recovery only, no automatic restart.
   R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
   Readiness needs verified service row / anchor / resolver restriction (user manager §8).

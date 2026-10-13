@@ -14,7 +14,7 @@ note over Host,Broker
   Target only: joint host_start / host_stop / session-scoped permit / runner-channel activation.
   Wire / proof formats and durable crash ordering remain unpublished (§3.3, §7).
   Dispatcher Unix-socket service (F-5/F-15): controls may serve with admission closed.
-  Dispatcher v0 refuses interactive/resume; user-manager signed grants are v2.
+  Dispatcher slice 0 refuses interactive/resume; user-manager signed grants are v2.
   Current / SH1: tb-sessiond owns PTY/app-server; Claude dies on replacement.
 end note
 
@@ -92,7 +92,7 @@ else Process absence confirmed
       Host -> State : keep delivery closed
     else Current per-start claim and session-scoped host admission permit
       Dispatcher -> Launcher : sole privileged start caller; existing claim / effect path
-      Launcher -> Launcher : validate generation, executor and home; reset environment/descriptors\nexisting launch intent / atomic root start receipt
+      Launcher -> Launcher : validate generation, executor, home and pinned exec-policy digest; refuse drift / all-stop mark; reset environment/descriptors\nexisting launch intent / atomic root start receipt
       Launcher -> Launcher : clear groups; set GID/UID
       Launcher -> Runner : exec approved runner; FD3 immutable plan only
       Runner -> Host : open fresh authenticated channel after UID change
@@ -155,11 +155,15 @@ note over Host,Dispatcher
   Survival and service-swap affected set require published unit / per-OS evidence.
   Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
   F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
-  R-WATCH: watcher requests per-account egress freeze and journaled dispatcher exec.stop.
+  R-WATCH v0: journaled dispatcher exec.stop; affected-session hold / status-only observer reads.
+  No v0 per-account egress freeze or phone alert; v1 freeze lifecycle remains open.
   Host parks or ends with durable reason; unknown absence keeps fence / claims.
   R-ALLSTOP: manual operator act closes every session delivery and snapshots bound boards.
   Dispatcher hold; range deny-all; stop every generation; freeze leases / renewals.
-  Delivered tokens keep vendor lifetime; each service journals; unknown keeps admission closed.
+  Delivered tokens keep vendor lifetime; direct same-act fan-out / per-service journals.
+  Prompt independent cuts; receiver launch/create/activation fence before absence scan.
+  Operator-helper stops progress without dispatcher; every durable part required before recovery.
+  Unknown keeps admission closed; recovery names stopped set / restart scope / owner authority.
   Keep fences until confirmed absence; explicit recovery only, no automatic restart.
   R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
   Readiness needs verified service row / anchor / resolver restriction (user manager §8).
@@ -170,7 +174,10 @@ note over Host,Dispatcher
   Detailed host wait/lock graph: M-SH5 / spec §3.4.
 end note
 note over Runner,Harness
-  R-EXEC: OS executable allowlist, writable areas non-executable; no self-started loops.
+  R-EXEC: machine-selected identity / body digest pinned at prepare; verify at start / retry.
+  OS executable allowlist, writable areas non-executable; no self-started loops.
+  Full invocation / transitive interpreted inputs qualified; no worker-selected code / plugins.
+  Unprovable local tool routes to R-VERIFY; direct and indirect heavy forms refuse.
   R-STANDING: same check also before every initial launch; native resume never bypasses it.
   Untrusted standing placement is workplace only; donor loop, no host session.
   R-VERIFY: no builds / tests / worker-code execution in session account;
