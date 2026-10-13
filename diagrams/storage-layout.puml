@@ -27,7 +27,7 @@ package "SH2+ target - activation gates, not current file layout" {
     artifact "Published host socket directory\nconnect permissions separate from data privacy" as socket
     artifact "Session + execution-scoped capabilities\naudience / actions / expiry / revocation\nissued by host" as caps
   }
-  node "worker-<label> trusted account" {
+  node "worker-<label> trusted-class local agent placement" {
     component "swarma-session-runner" as runner
     component "Claude Code / private Codex app-server" as harness
     artifact "Managed home / native-session lock / plan surfaces\ncontinuity binding: home, profile, transcript digest" as home
@@ -59,8 +59,18 @@ package "SH2+ target - activation gates, not current file layout" {
   dispatcher --> manager : sole privileged start caller / exec.stop / confirmed absence
 
   note bottom of state
+    Attribute / reserve / charge before durable acceptance: per-session / producer
+    byte + count budgets and aggregate service budget. Bounded transport / queues.
+    Retained debt survives replacement / retirement until safe disposition.
+    Hard control / journal / audit reserve is unavailable to producer output.
+    Preserve dispatcher output-size bound at host handoff; admission needs reserve.
+    At boundary: bounded backpressure / refusal or journaled park / host_stop.
+    Diagnostics separate from replay evidence; keep required retention floors.
+    Never delete required evidence for space; truncated transcript is not intact.
+    Incomplete evidence keeps closed / unknown; reserve does not cure filesystem loss.
+    Accounting / retention / values / qualification unpublished (§7.20).
     Agent-writable files are not trusted transcript/audit evidence.
-    Closed fence queues without delivery; unknown permits stay owned.
+    Closed fence queues within byte/count budget without delivery; unknown permits stay owned.
     Unreadable state is closed, never absence.
     Reconcile unknown delivery against intact transcript before reopening:
     matching marker proves applied; confirmed absence permits redelivery;
@@ -91,6 +101,11 @@ package "SH2+ target - activation gates, not current file layout" {
     Clock steps only narrow authority; expiry destruction also needs monotonic elapsed lifetime.
   end note
   note bottom of socket
+    Unchanged principal/id claim compares complete canonical signed intent via envelope_digest.
+    Exact retry returns original receipt; any changed intent conflicts; new ID required.
+    Binding persists through enqueue / dedup / receipt lookup; digest is not a claim key.
+    Signature value / bridge wrapper excluded; authority / expiry / retention still checked.
+    Canonical / receipt schema and vectors unpublished (§7.19).
     Kernel peer UID, server identity, close-on-exec, one role/connection.
     Managed principal = UID + generation; malformed/unreadable/ambiguous/
     retired ledger entry refuses fallback. Legacy token refused on activation.

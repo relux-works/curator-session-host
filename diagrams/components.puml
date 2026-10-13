@@ -22,7 +22,7 @@ package "swarma-session-host process / service account\nlogical responsibilities
   component "Provider readiness / acknowledgement adapters" as adapters
   database "Host-private durable metadata, logs, transcripts, receipts\nfences / epochs / inbox / goal revisions\nowner: host service" as durable
 }
-component "swarma-session-runner\nworker-<label>; trusted only; one per session\nPTY master / private app-server transport / lease client" as runner
+component "swarma-session-runner\nworker-<label>; trusted-class local placement; one per session\nPTY master / private app-server transport / lease client" as runner
 component "Claude Code / Codex private app-server\nworker-<label>; provider harness process" as harness
 
 caller --> board_state : optional board transactions
@@ -51,10 +51,16 @@ runner --> broker : renew execution credential lease
 note bottom of admission
   Refusal: wrong peer, inactive/unknown generation, invalid capability,
   stale epoch, unsupported starter; agent account has no goal capability.
+  Unchanged principal/id claim compares complete canonical signed intent via envelope_digest.
+  Exact retry returns original receipt; changed intent conflicts, requires new ID (§3.4).
+  Reserve / charge producer and aggregate storage before durable acceptance.
+  Closed queues bounded; admission needs protected control/evidence reserve (§3.1).
   Unknown permits remain owned; unreadable state is closed.
   Machine-local context policy stays independent of board facts (§2.3).
 end note
 note bottom of receipts
+  Retained output / input / evidence debt survives replacement and retirement.
+  Required evidence never deleted for space; incomplete transcript keeps closed / unknown.
   Matching input marker in intact transcript proves applied.
   Confirmed absence permits redelivery; unresolved stays unknown.
   Unknown approval/control effect cannot auto-replay (§3.4).
@@ -80,6 +86,8 @@ note bottom of engine
   Internal APIs / engine classes: unspecified in spec §3.
 end note
 note bottom of adapters
+  Dispatcher output-size bound carried through host handoff; runner buffers bounded.
+  Budget boundary: backpressure / refusal or journaled park / host_stop, no unbounded logs.
   Unknown readiness parks; Muse requires qualification.
   Codex renewal timeout fails turn with no fallback (§3.2).
   Current / SH1: all serving concerns remain composed into tb-sessiond;

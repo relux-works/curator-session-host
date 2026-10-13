@@ -179,7 +179,13 @@ note over Runner,Harness
   Full invocation / transitive interpreted inputs qualified; no worker-selected code / plugins.
   Unprovable local tool routes to R-VERIFY; direct and indirect heavy forms refuse.
   R-STANDING: same check also before every initial launch; native resume never bypasses it.
-  Untrusted standing placement is workplace only; donor loop, no host session.
+  Host loop requires trusted class + local placement + admitted launch, never circle alone.
+  Remote placement is workplace only even after circle admission; donor loop, no host session.
+  Runner buffers bounded; dispatcher output-size invariant survives host handoff.
+  Producer / aggregate retained debt survives replacement / retirement (§7.20).
+  Protected control/evidence reserve supports stop / park / fence / reconciliation.
+  Incomplete transcript never proves absence; remain closed / unknown.
+  Enqueue / dedup / receipt lookup retain principal/id-to-complete-intent binding (§7.19).
   R-VERIFY: no builds / tests / worker-code execution in session account;
   separate-machine isolated ephemeral runners without secrets; board receives data.
   R-TRANSFER rework is new admitted base C plus findings in task snapshot,

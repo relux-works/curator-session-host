@@ -4,7 +4,7 @@ hide empty description
 
 state "Session / delivery fence\nowner: swarma-session-host service process" as Session {
   state "Delivery open" as Open
-  state "Fence closed\nqueue without delivery" as Closed
+  state "Fence closed\nbounded queue without delivery" as Closed
   state "Parked (durable)" as Parked
   state "Stopped by explicit stop / operator action" as Stopped
   state "Controller reconciliation" as Reconcile
@@ -103,9 +103,12 @@ state "Wake / mail view\nbridge Mailbox and host inbox are distinct durable owne
   Inbox --> Held : closed fence / parked / stopped / needs re-authentication
   Inbox --> Deliver : open fence, ready boundary; current session/execution/epoch; admitted op_id
   Inbox --> Wedged : host detects deadline condition
-  Wedged --> Inbox : host_stop / confirmed absence / authorised successor host_start; new epoch; sender/message-id dedup
+  Wedged --> Inbox : host_stop / confirmed absence / authorised successor host_start; new epoch; immutable principal/id-to-complete-intent binding
   Wedged --> Held : park; host_stop; retain fence / claims if absence unknown
   note right of Held
+    Producer / aggregate byte + count budgets apply even with closed fence.
+    Bounded refusal / backpressure or journaled park / stop before reserve exhaustion.
+    Retained debt survives replacement / retirement; incomplete evidence stays unknown (§7.20).
     No stale-session wake; no agent self-rearming / model wait.
     Runner reports boundary / idleness / heartbeat via readiness grammar.
     Unknown readiness parks (§3.7).
@@ -158,7 +161,8 @@ note bottom of Session
   Trusted standing sessions have no preset lifetime / runtime limit (§3.5).
   They end only by explicit stop, operator action or own exit.
   Park and controlled restart do not end them.
-  Trusted standing only; untrusted standing placement is workplace with donor loop.
+  Host loop: trusted class + local placement + admitted launch; circle membership insufficient.
+  Remote placement remains workplace with donor loop even after circle admission.
   Emergency stop: operator authority, delivery closed, bound-board snapshot if any,
   host_stop under permit, fence / confirmed-absence receipts, explicit recovery (§3.5).
   host_stop is host-requested, distinct from owner cancel, and grants no start authority.
@@ -193,6 +197,11 @@ note bottom of Execution
 end note
 note bottom of Board
   R-TRANSFER: board accepts export as resource; orchestrator imports / reviews exact C / integrates.
+  Positive review-role grant + trusted-class local agent or person; never producer / untrusted class.
+  Circle alone grants no review; optional local-only / requester exclusion policies stay open / off.
+  Exact-C inert diffs/blobs outside discovery roots; tree entry needs qualified strict adapter.
+  No automatic candidate control adoption at startup / reload / nested read / resume / child entry.
+  Acknowledge every flagged hunk with no prior load; acceptance is not control-context admission.
   Rework uses candidate base C and findings in new local task snapshot; never same-plan restart.
   R-VERIFY: tester orchestrates isolated ephemeral runners on another machine without secrets.
   Builds / tests / generators / worker-code execution never run in session account (R-EXEC).

@@ -7,7 +7,7 @@ participant "Worker\ntrusted host session or untrusted workplace with donor loop
 participant "swarma-rb-exec\nproject-side workplace executor" as ProjectExec
 participant "swarma-user-manager" as Manager
 participant "Board change-request machinery" as Board
-participant "Trusted reviewer\ndistinct from producer" as Reviewer
+participant "Reviewer with positive review-role grant\ntrusted-class local agent or person; outside untrusted class\ndistinct from producer; circle alone insufficient" as Reviewer
 participant "Isolated ephemeral verification runner\nanother machine; no secrets" as Verify
 
 Caller -> Dispatcher : admitted exact base B canonical archive + task snapshot / write scope / exec profile
@@ -29,7 +29,9 @@ note over Workspace,Worker
   Full invocation and interpreted inputs qualified; worker bytes stay inert locally.
   Direct / indirect heavy forms refuse; unprovable local tools route to R-VERIFY.
   No builds / tests / self-started agent loop; admitted executor alone starts trusted harness.
-  Workplace has zero egress and donor loop only; local trusted provider-only proxy.
+  Workplace has zero egress and donor loop only, even after circle admission.
+  Host loop requires trusted class + local placement + admitted launch; membership insufficient.
+  Local trusted provider-only proxy.
   Web default-off; explicit trusted-circle opt-in only.
   Trusted side attaches task resources / remote signed-letter attachments;
   platform materializes them read-only beside workspace, digests in plan.
@@ -88,6 +90,18 @@ else Absence confirmed
       Caller -> Board : result resource; deterministic import on B, scratch index, no hooks / filters / drivers
       Board -> Board : refuse .git / outside write scope / .task-board; flag sensitive paths and symlinks
       Board --> Caller : signed repository candidate C; worker / run / digest trailers; recomputable tree
+      Board -> Reviewer : exact-C diffs / blobs as read-only digest-bound inert resources outside discovery roots
+      note over Caller,Reviewer
+        Every candidate consumer (reviewer / orchestrator / tester): untrusted data only.
+        No automatic instructions / hooks / MCP / permissions / skills / executable discovery
+        at startup / reload / nested discovery / resume / child entry, before or after acknowledgement.
+        Tree entry in a discovery-capable harness needs qualified strict-context adapter.
+        Unqualified tuple refuses that path; root-supplied surfaces alone do not suffice.
+        Record every flagged hunk and no prior automatic load; inert path ensures ordering.
+        Acceptance is not control-context admission; activation remains a separate decision.
+        Semantic prompt injection still needs review scrutiny; qualification unpublished (§7.22).
+        Local-only reviewer / requester exclusion policies are open and off (§7.21).
+      end note
       Caller -> Reviewer : review exactly C; K1 acceptance never transfers by patch equality
       Caller -> Verify : controlled verification job; dependency egress (R-NET-TOOL)
       Verify --> Board : results as data, testing state; tester reads / orchestrates only

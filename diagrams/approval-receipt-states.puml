@@ -16,7 +16,10 @@ state "Delivery receipt vocabulary\ndurable state owner: swarma-session-host ser
   Unknown --> Redelivery : confirmed marker absence in intact transcript
   Unknown --> Unknown : unresolved evidence; keep fence closed
   note right of Queued
-    Closed fence may queue, never deliver.
+    Closed fence may queue within byte/count budgets, never deliver.
+    Reserve / charge before durable acknowledgement; producer / aggregate limits.
+    Protected control/evidence reserve; retained debt survives replacement / retirement.
+    Incomplete / truncated transcript stays closed / unknown; never delete required evidence.
     R-ALLSTOP closes delivery for every session, snapshots bound boards;
     confirmed absence required, explicit recovery only.
     No acknowledgement without durable host write.
@@ -25,7 +28,7 @@ state "Delivery receipt vocabulary\ndurable state owner: swarma-session-host ser
   end note
   note right of Redelivery
     Reconcile before fence reopening; ordinary input may redeliver
-    with sender/message-id dedup and idempotent op_id (§3.4, §3.7).
+    with immutable principal/id-to-complete-intent binding and idempotent op_id (§3.4, §3.7).
     Unknown approval answer / control effect MUST NOT auto-replay.
   end note
 }
@@ -50,6 +53,15 @@ state "Pending native interaction / approval\nstate and authority owner: host se
     Approval wire/state schema and allowlist values: unspecified in spec §7.
   end note
 }
+
+note bottom of Receipts
+  Claim key stays principal/id; store / compare envelope_digest of complete canonical
+  signed content, excluding signature value / bridge wrapper, before enqueue or receipt lookup.
+  Exact-byte retry returns original receipt; changed signed intent conflicts and needs a new ID.
+  Digest is not part of claim key; body-only comparison is insufficient.
+  Separate authority / expiry / reconciliation / retention checks remain.
+  Canonical coverage / ordering / schema and qualification vectors pending (§7.19).
+end note
 
 note bottom of Approval
   Process identities: swarma-session-host under its service account admits

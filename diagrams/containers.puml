@@ -43,7 +43,7 @@ package "SH2+ target - disabled until joint activation gates" {
   node "User-manager module / root launch boundary" {
     component "swarma-user-launcher" as root_launcher
   }
-  node "worker-<label> trusted agent account - one runner per session" {
+  node "worker-<label> trusted-class local placement - one runner per session" {
     component "swarma-session-runner\nPTY master or app-server transport\ncredential lease client" as runner
     component "Claude Code\nor qualified provider harness" as harness
     component "Codex private app-server\nno shared pool" as appserver
@@ -73,7 +73,14 @@ package "SH2+ target - disabled until joint activation gates" {
   note bottom of host
     Refuse stale epoch, invalid capability, legacy global token,
     unreadable / malformed / retired identity and unsupported starters.
-    Closed fence queues without delivery; unknown readiness parks.
+    Closed fence queues within byte/count budgets without delivery; unknown readiness parks.
+    Reserve / charge producer and aggregate retained bytes before durable acceptance.
+    Debt survives replacement / retirement; producer cannot consume control/evidence reserve.
+    Bounded runner buffers / dispatcher output handoff; backpressure / refusal or park / host_stop.
+    Admission needs reserve; incomplete evidence remains closed / unknown (§7.20).
+    Unchanged principal/id claim compares complete canonical signed intent via envelope_digest.
+    Exact retry returns original receipt; changed intent conflicts / new ID required (§7.19).
+    Host loop: trusted class + local placement + admitted launch, never circle alone.
     Controller failure: reconcile before input; live runner may be
     re-adopted with same execution ID. Replacement requires confirmed absence.
     Trusted standing sessions / executions have no preset lifetime or runtime limit.

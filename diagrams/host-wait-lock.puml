@@ -21,6 +21,9 @@ note bottom of lock
   Singleton / process-ownership locks are exempt; do not release them mechanically.
 end note
 note bottom of inflight
+  Durable transition capacity comes from protected control / journal / audit reserve.
+  Producer output cannot consume reserve; retained debt survives replacement / retirement.
+  Budgets / bounded refusal logging / storage-failure semantics unpublished (§7.20).
   Ownership tracked by durable per-record in-flight marker, not global lock across I/O.
   Cancel/fence withdrawal records intent promptly; mid-call withdrawal uses a second
   unlocked dispatcher call and claim/receipt interlock. Retain possibly executed claims.
