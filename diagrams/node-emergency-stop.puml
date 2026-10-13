@@ -18,14 +18,17 @@ note over Operator,Control
   Refuse acts from agent sessions; observer account permits read-only status.
   Binary / wire / signature domain / canonical bytes unpublished (§7.16).
 end note
-Control -> Dispatcher : R-ALLSTOP operator act (format unpublished)
 Dispatcher -> Dispatcher : journal hold; close admission
-note over Dispatcher,Boards : Each service journals its own part; arrows do not publish a coordination wire or crash order.
-Dispatcher -> Manager : deny-all agent / workplace UID range (R-RANGE-DENY)
+note over Control,Boards
+  Each service journals its own part; arrows do not publish a coordination wire or crash order.
+  Same operator act / service responsibilities only; act format unpublished.
+  No coordination topology or coordinator is selected or implied.
+end note
+Manager -> Manager : deny-all agent / workplace UID range (R-RANGE-DENY)
 Manager -> Manager : journal stop of every generation; account-wide scope / confirmed absence
-Dispatcher -> Broker : freeze all leases and renewals
+Broker -> Broker : freeze all leases and renewals
 note over Broker : Tokens already delivered retain vendor lifetime.
-Dispatcher -> Host : close delivery for every session
+Host -> Host : close delivery for every session
 Host -> State : journal closed delivery fences; invalidate pending interactions
 Host -> Boards : snapshot bound boards; no board required for goal-free session
 alt Every required stop / snapshot / journal result known and absence confirmed

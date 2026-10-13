@@ -10,7 +10,7 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   state "Controller reconciliation" as Reconcile
   state "Controlled restart\nonly fence-holding operation" as Restart
   Open --> Parked : authorised park / unknown readiness / needs re-authentication
-  Open --> Closed : close fence; invalidate pending interactions
+  Open --> Closed : close fence, including R-ALLSTOP; invalidate pending interactions
   Open --> Reconcile : controller failure; prohibit runner input
   Closed --> Reconcile : controller failure
   Reconcile --> Closed : evidence unknown / unreadable; retain permits
@@ -21,9 +21,9 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   Restart --> Parked : unsupported row / unknown readiness or lock / surface drift (R-STANDING)
   Restart --> Closed : unknown process absence or delivery outcome
   Restart --> Open : process absence; admitted fresh runner confirms native-lock absence; readiness and reconciliation
-  Open --> Stopped : explicit stop / operator action, including R-ALLSTOP (§3.5)
-  Closed --> Stopped : R-ALLSTOP; hold fence until confirmed absence
-  Parked --> Stopped : R-ALLSTOP; no automatic restart
+  Open --> Stopped : explicit stop / operator action, including R-ALLSTOP; confirmed absence (§3.5)
+  Closed --> Stopped : R-ALLSTOP; confirmed absence
+  Parked --> Stopped : R-ALLSTOP; confirmed absence; no automatic restart
   Open --> Parked : journaled R-WATCH stop; record reason; keep fence if absence unknown
   note right of Parked
     No wake of parked or stopped sessions.
@@ -40,6 +40,7 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
     Prepare durable intent and closed fence before host_start.
     Fence change withdraws or reconciles affected start authority.
     Host failure retains dispatcher claim and closed fence.
+    R-ALLSTOP: absence unknown keeps delivery closed and claims held; no Stopped transition.
     Exact per-effect state schema: unspecified in spec §3.4 / §7.
   end note
   note right of Restart

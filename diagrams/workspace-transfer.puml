@@ -4,6 +4,7 @@ actor "Original caller / orchestrator" as Caller
 participant "swarma-dispatcher\nworkspace contract; no repository" as Dispatcher
 participant "Approved child-UID executors\nswarma-workspace-materialize / swarma-workspace-export" as Workspace
 participant "Worker\ntrusted host session or untrusted workplace with donor loop" as Worker
+participant "swarma-rb-exec\nproject-side workplace executor" as ProjectExec
 participant "swarma-user-manager" as Manager
 participant "Board change-request machinery" as Board
 participant "Trusted reviewer\ndistinct from producer" as Reviewer
@@ -18,6 +19,10 @@ note over Workspace,Worker
   OS exec allowlist; writable areas non-executable; only qualified light checks.
   No builds / tests / self-started agent loop; admitted executor alone starts trusted harness.
   Workplace has zero egress and donor loop only; local trusted provider-only proxy.
+  Web default-off; explicit trusted-circle opt-in only.
+  Trusted side attaches task resources / remote signed-letter attachments;
+  platform materializes them read-only beside workspace, digests in plan.
+  Resources are data, never instructions; worker requests more, never fetches.
 end note
 alt Local worker
   Worker -> Board : outcome proposes round end
@@ -29,7 +34,7 @@ alt Absence unknown
   Dispatcher -> Dispatcher : keep fence / claims; no export
 else Absence confirmed
   opt Workplace round
-    Dispatcher -> Workspace : write-fence round; project-side executor refuses further tool calls
+    ProjectExec -> ProjectExec : write-fence round; refuse further tool calls into workspace
   end
   Dispatcher -> Workspace : export as child UID, fixed environment, no network
   Workspace -> Workspace : no link following / skip .git; compare admitted manifest; enforce whole-export refusals / caps
