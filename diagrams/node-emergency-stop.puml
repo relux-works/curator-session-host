@@ -1,0 +1,47 @@
+@startuml
+title R-ALLSTOP - Manual node-wide emergency stop (SH2+ target)
+actor "Operator\nphone or terminal fallback" as Operator
+participant "swarma-operator\noperator command; never harness account" as Control
+participant "swarma-dispatcher" as Dispatcher
+participant "swarma-user-manager" as Manager
+participant "swarma-credential-broker" as Broker
+participant "swarma-session-host" as Host
+database "Host-private journal / fences" as State
+participant "Bound boards (if any)" as Boards
+
+Operator -> Control : one narrowing act; phone authentication + one confirmation, or password sudo fallback
+note over Operator,Control
+  R-OPERATOR: phone key never leaves hardware secure element; biometric presence.
+  Exact act signed on phone; pinned key / canonical content verified; no signature reuse.
+  Tailnet SSH into operator account; forced narrow operator command, no shell.
+  Terminal: no NOPASSWD / cached ticket (timestamp_timeout=0).
+  Refuse acts from agent sessions; observer account permits read-only status.
+  Binary / wire / signature domain / canonical bytes unpublished (§7.16).
+end note
+Control -> Dispatcher : R-ALLSTOP operator act (format unpublished)
+Dispatcher -> Dispatcher : journal hold; close admission
+note over Dispatcher,Boards : Each service journals its own part; arrows do not publish a coordination wire or crash order.
+Dispatcher -> Manager : deny-all agent / workplace UID range (R-RANGE-DENY)
+Manager -> Manager : journal stop of every generation; account-wide scope / confirmed absence
+Dispatcher -> Broker : freeze all leases and renewals
+note over Broker : Tokens already delivered retain vendor lifetime.
+Dispatcher -> Host : close delivery for every session
+Host -> State : journal closed delivery fences; invalidate pending interactions
+Host -> Boards : snapshot bound boards; no board required for goal-free session
+alt Every required stop / snapshot / journal result known and absence confirmed
+  Host -> State : record confirmed absence; keep stopped pending explicit recovery
+else Partial / unknown result or absence unconfirmed
+  Host -> State : retain fences and claims
+  Dispatcher -> Dispatcher : keep admission closed
+end
+note over Dispatcher,Host
+  Recovery is explicit, never automatic restart.
+  R-LOCK: host holds state lock for local journal transitions only;
+  board / dispatcher waits happen without the host state lock.
+  R-WATCH never invokes this node-wide act automatically.
+end note
+legend bottom
+  [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: R-ALLSTOP / R-OPERATOR]]
+  [[../spec/session-host.md#7-open-questions Spec §7.16: unpublished act and recovery]]
+endlegend
+@enduml

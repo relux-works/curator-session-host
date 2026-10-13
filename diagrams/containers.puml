@@ -43,7 +43,7 @@ package "SH2+ target - disabled until joint activation gates" {
   node "User-manager module / root launch boundary" {
     component "swarma-user-launcher" as root_launcher
   }
-  node "worker-<label> agent account - one runner per session" {
+  node "worker-<label> trusted agent account - one runner per session" {
     component "swarma-session-runner\nPTY master or app-server transport\ncredential lease client" as runner
     component "Claude Code\nor qualified provider harness" as harness
     component "Codex private app-server\nno shared pool" as appserver
@@ -66,8 +66,8 @@ package "SH2+ target - disabled until joint activation gates" {
   manager --> root_launcher : module's privileged launcher
   root_launcher --> runner : receipt before UID/GID change and exec\nFD3 plan only; no broker descriptor
   runner <--> host : authenticated reconnect / readiness / current epoch input
-  runner --> harness : owns PTY master
-  runner --> appserver : owns private transport
+  runner --> harness : start only admitted harness / owns PTY master
+  runner --> appserver : admitted private app-server / owns transport
   runner --> broker : open after UID change; lease renewals
 
   note bottom of host
@@ -76,7 +76,7 @@ package "SH2+ target - disabled until joint activation gates" {
     Closed fence queues without delivery; unknown readiness parks.
     Controller failure: reconcile before input; live runner may be
     re-adopted with same execution ID. Replacement requires confirmed absence.
-    Standing sessions / executions have no preset lifetime or runtime limit.
+    Trusted standing sessions / executions have no preset lifetime or runtime limit.
     Only explicit stop, operator action or own exit ends the session (§3.5).
     Park and restart preserve it; dispatcher runtime maximum is non-standing only.
     Durable intent and closed fence precede host_start.
@@ -129,6 +129,12 @@ note bottom of dispatcher
   Survival and service-swap affected set require published unit / per-OS evidence.
   Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
   F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-WATCH: watcher requests per-account egress freeze and journaled dispatcher exec.stop.
+  Host parks or ends with durable reason; unknown absence keeps fence / claims.
+  R-ALLSTOP: manual operator act closes every session delivery and snapshots bound boards.
+  Dispatcher hold; range deny-all; stop every generation; freeze leases / renewals.
+  Delivered tokens keep vendor lifetime; each service journals; unknown keeps admission closed.
+  Keep fences until confirmed absence; explicit recovery only, no automatic restart.
   R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
   Readiness needs verified service row / anchor / resolver restriction (user manager §8).
   F-15: authenticated controls / observation / already-authorised stop stay reachable
@@ -136,6 +142,37 @@ note bottom of dispatcher
   R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
   Late results revalidated under lock; stale results never reopen delivery / admission.
   Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
+note bottom of runner
+  R-EXEC: runner starts only the admitted harness; no self-started agent environment.
+  OS executable allowlist; writable areas never executable; qualified light checks only.
+  R-STANDING: trusted standing settings / hooks / MCP / instructions come from plan.
+  Executor checks digests before every launch / restart / native resume,
+  or supplies root-owned surfaces outside home. Drift refuses and is reported;
+  explicit re-materialization repairs; refusal code unpublished.
+  R-NET-TOOL: provider-only bound proxy, no general internet / push / merge requests.
+  Internet is an agent-loop tool; network-profiles N15 owns proxy rules / caps / logs.
+  R-VERIFY: builds / tests / worker-code execution only on another machine,
+  in ephemeral isolated runners without secrets; controlled dependency egress.
+  Tester orchestrates, reads data; results go to board testing state.
+  Runner pool / job / result formats unpublished (§7.17).
+end note
+note bottom of dispatcher
+  R-TRANSFER: dispatcher owns materialization / export, not launcher or host.
+  Approved child-UID executors; exact base / manifest / scope / exec profile digested.
+  No worker Git history; export only after account-wide absence / workplace write fence.
+  Export cleanup obligation precedes home deletion unless operator explicitly waives.
+  Board resource -> orchestrator deterministic import -> exact signed candidate review.
+  Rework: new admitted candidate base + findings in task snapshot; not same-plan restart.
+  No transfer authority added to host; formats / caps / import command unpublished.
+  R-UNTRUSTED: every workplace is untrusted, recorded at registration / admission.
+  Untrusted standing placement is workplace only, loop at donor; no broker binding / lease.
+  Slice 0 / user-manager v0 refuse untrusted; refusal code unpublished.
+  R-NET-TOOL: workplace zero egress / loopback denied; no direct / external-http-proxy.
+  R-CEILINGS: qualified host/OS capability matrix gates class; no OS excluded by name.
+  R-RANGE-DENY: static range deny precedes accounts; active precedence proof gates readiness.
+  R-SOCKETS: probe reachable sockets equal declared platform set.
+  R-SHARED: untrusted host runs no shared services; platform services excepted.
 end note
 legend bottom
   [[../spec/session-host.md#1-what-the-host-is Spec §1: phases and ownership]]

@@ -1,0 +1,68 @@
+@startuml
+title R-TRANSFER / R-VERIFY - Workspace round, exact candidate and rework (SH2+ target)
+actor "Original caller / orchestrator" as Caller
+participant "swarma-dispatcher\nworkspace contract; no repository" as Dispatcher
+participant "Approved child-UID executors\nswarma-workspace-materialize / swarma-workspace-export" as Workspace
+participant "Worker\ntrusted host session or untrusted workplace with donor loop" as Worker
+participant "swarma-user-manager" as Manager
+participant "Board change-request machinery" as Board
+participant "Trusted reviewer\ndistinct from producer" as Reviewer
+participant "Isolated ephemeral verification runner\nanother machine; no secrets" as Verify
+
+Caller -> Dispatcher : admitted exact base B canonical archive + task snapshot / write scope / exec profile
+Dispatcher -> Dispatcher : journal archive digest; plan covers B / file-manifest digest / write scope / profile
+Dispatcher -> Workspace : materialize before work as child UID
+Workspace -> Worker : fresh standalone repository; local config; no hooks / remotes / credential helpers
+note over Workspace,Worker
+  No linked Git administration across accounts; worker Git history never consumed.
+  OS exec allowlist; writable areas non-executable; only qualified light checks.
+  No builds / tests / self-started agent loop; admitted executor alone starts trusted harness.
+  Workplace has zero egress and donor loop only; local trusted provider-only proxy.
+end note
+alt Local worker
+  Worker -> Board : outcome proposes round end
+else Remote worker
+  Worker -> Caller : signed final envelope proposes round end
+end
+Dispatcher -> Manager : journaled account-wide stop / confirmed process absence
+alt Absence unknown
+  Dispatcher -> Dispatcher : keep fence / claims; no export
+else Absence confirmed
+  opt Workplace round
+    Dispatcher -> Workspace : write-fence round; project-side executor refuses further tool calls
+  end
+  Dispatcher -> Workspace : export as child UID, fixed environment, no network
+  Workspace -> Workspace : no link following / skip .git; compare admitted manifest; enforce whole-export refusals / caps
+  Workspace --> Dispatcher : changes only; no worker commits
+  Dispatcher -> Dispatcher : journal digests / export cleanup obligation
+  Dispatcher --> Caller : swarma-dispatcher workspace-result/1; original caller only
+  Caller -> Board : result resource; deterministic import on B, scratch index, no hooks / filters / drivers
+  Board -> Board : refuse .git / outside write scope / .task-board; flag sensitive paths and symlinks
+  Board --> Caller : signed repository candidate C; worker / run / digest trailers; recomputable tree
+  Caller -> Reviewer : review exactly C; K1 acceptance never transfers by patch equality
+  Caller -> Verify : controlled verification job; dependency egress (R-NET-TOOL)
+  Verify --> Board : results as data, testing state; tester reads / orchestrates only
+  alt Changes requested
+    Reviewer -> Board : findings for candidate C
+    Caller -> Dispatcher : new admitted base C + findings in local task snapshot, or remote signed task letter
+    note over Caller,Worker
+      Materialize afresh; remote donor session continues.
+      Remove previous workspace only after recorded export.
+      Next export yields C2 on C; not an unchanged-plan R-SESSION restart.
+    end note
+  else Accepted exact head
+    Reviewer -> Board : acceptance bound to exact candidate; explicit flagged-hunk acknowledgements
+    Caller -> Board : signed fast-forward integration K1/K3; moved base requires refresh / re-review
+  end
+end
+note over Dispatcher,Board
+  Export precedes retirement / home deletion unless operator explicitly waives obligation.
+  Host adds no transfer authority. No untrusted candidate sent to secret-bearing CI before acceptance.
+  Archive / exact plan / export caps / result schema + retention / import command unpublished (§7.13).
+  Verification pool / job / result format unpublished (§7.17).
+end note
+legend bottom
+  [[../spec/session-host.md#31-service-account-state-and-capabilities Spec §3.1: dispatcher workspace and admission]]
+  [[../spec/session-host.md#35-park-restart-emergency-stop-board-completion Spec §3.5: candidate / rework / verification]]
+endlegend
+@enduml

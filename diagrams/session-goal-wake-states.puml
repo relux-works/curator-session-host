@@ -18,10 +18,13 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
   Open --> Restart : authorised restart; close fence / drain
   Parked --> Restart : explicit recovery (§3.5)
   Stopped --> Restart : explicit recovery; no automatic restart
-  Restart --> Parked : unsupported recovery row / unknown readiness / unknown native-lock result
+  Restart --> Parked : unsupported row / unknown readiness or lock / surface drift (R-STANDING)
   Restart --> Closed : unknown process absence or delivery outcome
   Restart --> Open : process absence; admitted fresh runner confirms native-lock absence; readiness and reconciliation
-  Open --> Stopped : explicit stop / operator action, including emergency stop (§3.5)
+  Open --> Stopped : explicit stop / operator action, including R-ALLSTOP (§3.5)
+  Closed --> Stopped : R-ALLSTOP; hold fence until confirmed absence
+  Parked --> Stopped : R-ALLSTOP; no automatic restart
+  Open --> Parked : journaled R-WATCH stop; record reason; keep fence if absence unknown
   note right of Parked
     No wake of parked or stopped sessions.
     Goal-free park has no board barrier.
@@ -51,6 +54,9 @@ state "Session / delivery fence\nowner: swarma-session-host service process" as 
     Fresh runner under agent account checks native-lock absence
     under closed fence and reports to host before harness initialisation / resume.
     Unknown native-lock result keeps session parked (§3.5).
+    R-STANDING: executor verifies plan surface digests every launch / restart / native resume,
+    or supplies from root-owned location outside home; drift refuses and reports.
+    Repair only by explicit re-materialization; refusal code unpublished.
   end note
 }
 
@@ -60,7 +66,7 @@ state "Execution (separate from session)\nrecords / capacity owner: swarma-dispa
   state "Confirmed execution absence" as Absent
   state "Unknown process evidence\ncapacity remains owned" as UnknownExecution
   Live --> Live : controller-only re-adoption keeps execution ID
-  Live --> Stopping : host_stop (restart / wedged park / emergency stop) or operator maintenance stop
+  Live --> Stopping : host_stop / maintenance / journaled R-WATCH stop / R-ALLSTOP
   Live --> Absent : own exit; durable exit receipt and confirmed absence (§3.2, §3.5)
   Stopping --> Absent : latest receipt; TERM / KILL all UID processes; user domain stopped; quiet-period absence
   Stopping --> UnknownExecution : absence cannot be confirmed
@@ -68,7 +74,7 @@ state "Execution (separate from session)\nrecords / capacity owner: swarma-dispa
   UnknownExecution --> Absent : confirmed absence (§3.2)
   Absent --> Live : owner session lifecycle authorisation; successor host_start; new execution ID / current epoch / readiness
   note right of Absent
-    Standing executions have no preset runtime maximum.
+    Trusted standing executions have no preset runtime maximum.
     R-MAINT (§3.5 / dispatcher §11): close admission; inventory;
     stop selected executions with explicit operator authority via exec.stop.
     Deadline bounds maintenance attempt, never session / execution lifetime.
@@ -77,7 +83,8 @@ state "Execution (separate from session)\nrecords / capacity owner: swarma-dispa
     keep standing allocations / identities; R-MAINT withdraws permit; restart needs fresh owner admission.
     No live dispatcher adoption or automatic expiry.
     Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
-    Only confirmed absence permits release / replacement / cleanup.
+    Only confirmed absence permits release / replacement.
+    R-TRANSFER: home cleanup also needs recorded export or explicit operator waiver.
     Exit receipts are durable and replayable.
     Exit never satisfies optional board wait (§3.5).
     Runner owns Claude Code PTY / private Codex app-server transport and lease client.
@@ -147,10 +154,11 @@ state "Optional board waiting / terminal view\nowner: board/orchestrator, initia
 
 note bottom of Session
   Views are conceptual, not newly specified wire enums or a combined FSM.
-  Standing sessions have no preset lifetime / runtime limit (§3.5).
+  Trusted standing sessions have no preset lifetime / runtime limit (§3.5).
   They end only by explicit stop, operator action or own exit.
   Park and controlled restart do not end them.
-  Emergency stop: operator authority, bound-board snapshot if any,
+  Trusted standing only; untrusted standing placement is workplace with donor loop.
+  Emergency stop: operator authority, delivery closed, bound-board snapshot if any,
   host_stop under permit, fence / confirmed-absence receipts, explicit recovery (§3.5).
   host_stop is host-requested, distinct from owner cancel, and grants no start authority.
   Current / SH1 preserves tb-sessiond-owned transports and attached-client notices;
@@ -164,6 +172,12 @@ note bottom of Execution
   Survival and service-swap affected set require published unit / per-OS evidence.
   Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
   F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-WATCH: watcher requests per-account egress freeze and journaled dispatcher exec.stop.
+  Host parks or ends with durable reason; unknown absence keeps fence / claims.
+  R-ALLSTOP: manual operator act closes every session delivery and snapshots bound boards.
+  Dispatcher hold; range deny-all; stop every generation; freeze leases / renewals.
+  Delivered tokens keep vendor lifetime; each service journals; unknown keeps admission closed.
+  Keep fences until confirmed absence; explicit recovery only, no automatic restart.
   R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
   Readiness needs verified service row / anchor / resolver restriction (user manager §8).
   F-15: authenticated controls / observation / already-authorised stop stay reachable
@@ -171,6 +185,13 @@ note bottom of Execution
   R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
   Late results revalidated under lock; stale results never reopen delivery / admission.
   Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
+note bottom of Board
+  R-TRANSFER: board accepts export as resource; orchestrator imports / reviews exact C / integrates.
+  Rework uses candidate base C and findings in new local task snapshot; never same-plan restart.
+  R-VERIFY: tester orchestrates isolated ephemeral runners on another machine without secrets.
+  Builds / tests / generators / worker-code execution never run in session account (R-EXEC).
+  Results are data in board testing state; runner job/results formats unpublished.
 end note
 legend bottom
   [[../spec/session-host.md#34-effects-fences-and-admission Spec §3.4: fences and epochs]]

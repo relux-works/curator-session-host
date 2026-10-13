@@ -32,7 +32,7 @@ alt Live authenticated runner confirmed
     FD3 carries only plan; no extra inherited descriptor assumed.
   end note
 else Execution confirmed absent
-  Dispatcher -> Dispatcher : absence permits capacity release / cleanup / replacement
+  Dispatcher -> Dispatcher : absence permits capacity release / replacement; cleanup still requires recorded export or operator waiver
 else Unknown or unreadable execution evidence
   Host -> State : keep fence closed / evidence unknown
   Dispatcher -> Dispatcher : keep capacity owned; no replacement or cleanup
@@ -41,7 +41,7 @@ end
 == Separate scenario: authorised controlled restart (§3.5), only fence holder ==
 note over Host,Runner
   Controller-only re-adoption above does not itself require an execution restart.
-  Standing sessions / executions have no preset lifetime or runtime limit.
+  Trusted standing sessions / executions have no preset lifetime or runtime limit.
   Only explicit stop, operator action (including emergency stop) or own exit ends a session.
   Park and controlled restart preserve the session; restart replaces only its execution.
   Dispatcher 12-hour maximum applies only to non-standing executions (§3.5).
@@ -106,27 +106,33 @@ else Process absence confirmed
         Host -> State : park; no harness initialisation / native resume / reopening
       else Native-lock absence confirmed
         Runner -> Broker : open broker connection after UID change (broker-mode Codex)
-        Runner -> Harness : initialise / native resume under closed host fence
-        alt Harness native resume fails
-          Runner --> Host : resume-failed
-          Host --> Caller : resume-failed; caller decides next action
-          note over Host,Harness : No automatic fallback or portable seed on native resume.
-        else Readiness unknown or re-authentication needed
-          Runner --> Host : unknown readiness / authentication not ready
-          Host -> State : park; keep delivery closed
-        else Admitted readiness reported
-          Runner --> Host : readiness after current-epoch registration / replayable start and readiness receipts
-          Host -> State : reconcile dispatched input marker against intact transcript
-          alt Matching marker
-            Host -> State : receipt applied; no duplicate delivery
-            Host -> State : reopen only after restart checks and reconciliation
-          else Confirmed marker absence in intact transcript (ordinary input)
-            Host -> State : redelivery permitted; reopen after reconciliation
-            Host -> Runner : redeliver at turn boundary, same sender/message identity and op_id
-            note over Host,Runner : This ordinary-input branch never auto-replays an unknown approval or control effect.
-          else Unresolved evidence
-            Host -> State : unknown; keep fence closed
-            note over Host,Runner : Unknown approval answer / control effect never auto-replays.
+        Runner -> Runner : executor checks plan surfaces by digest or supplies root-owned surfaces outside home (R-STANDING)
+        alt Surface drift
+          Runner --> Host : refuse launch and report drift; code unpublished
+          Host -> State : keep delivery closed; explicit re-materialization required
+        else Surface verified / root-owned supply
+          Runner -> Harness : initialise / native resume of admitted harness only under closed host fence
+          alt Harness native resume fails
+            Runner --> Host : resume-failed
+            Host --> Caller : resume-failed; caller decides next action
+            note over Host,Harness : No automatic fallback or portable seed on native resume.
+          else Readiness unknown or re-authentication needed
+            Runner --> Host : unknown readiness / authentication not ready
+            Host -> State : park; keep delivery closed
+          else Admitted readiness reported
+            Runner --> Host : readiness after current-epoch registration / replayable start and readiness receipts
+            Host -> State : reconcile dispatched input marker against intact transcript
+            alt Matching marker
+              Host -> State : receipt applied; no duplicate delivery
+              Host -> State : reopen only after restart checks and reconciliation
+            else Confirmed marker absence in intact transcript (ordinary input)
+              Host -> State : redelivery permitted; reopen after reconciliation
+              Host -> Runner : redeliver at turn boundary, same sender/message identity and op_id
+              note over Host,Runner : This ordinary-input branch never auto-replays an unknown approval or control effect.
+            else Unresolved evidence
+              Host -> State : unknown; keep fence closed
+              note over Host,Runner : Unknown approval answer / control effect never auto-replays.
+            end
           end
         end
       end
@@ -149,6 +155,12 @@ note over Host,Dispatcher
   Survival and service-swap affected set require published unit / per-OS evidence.
   Dispatcher supervisor writes fenced by daemon-instance epoch; no live adoption.
   F-13: latest receipt authorises stop; signalling / absence scope is all UID processes.
+  R-WATCH: watcher requests per-account egress freeze and journaled dispatcher exec.stop.
+  Host parks or ends with durable reason; unknown absence keeps fence / claims.
+  R-ALLSTOP: manual operator act closes every session delivery and snapshots bound boards.
+  Dispatcher hold; range deny-all; stop every generation; freeze leases / renewals.
+  Delivered tokens keep vendor lifetime; each service journals; unknown keeps admission closed.
+  Keep fences until confirmed absence; explicit recovery only, no automatic restart.
   R-SVC-EGRESS: host deny-all, including loopback TCP; Unix-socket calls only.
   Readiness needs verified service row / anchor / resolver restriction (user manager §8).
   F-15: authenticated controls / observation / already-authorised stop stay reachable
@@ -156,6 +168,15 @@ note over Host,Dispatcher
   R-LOCK: no state lock across dispatcher or runner call; durable in-flight marker.
   Late results revalidated under lock; stale results never reopen delivery / admission.
   Detailed host wait/lock graph: M-SH5 / spec §3.4.
+end note
+note over Runner,Harness
+  R-EXEC: OS executable allowlist, writable areas non-executable; no self-started loops.
+  R-STANDING: same check also before every initial launch; native resume never bypasses it.
+  Untrusted standing placement is workplace only; donor loop, no host session.
+  R-VERIFY: no builds / tests / worker-code execution in session account;
+  separate-machine isolated ephemeral runners without secrets; board receives data.
+  R-TRANSFER rework is new admitted base C plus findings in task snapshot,
+  not the unchanged-plan successor path drawn here. Export precedes home deletion.
 end note
 legend bottom
   [[../spec/session-host.md#32-holders-under-agent-accounts-and-the-process-tree Spec §3.2: reconnect, receipts and confirmed absence]]

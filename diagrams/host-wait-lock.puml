@@ -26,6 +26,9 @@ note bottom of inflight
   unlocked dispatcher call and claim/receipt interlock. Retain possibly executed claims.
   Fresh authority checks on authority-creating use; intent is not an authority cache.
   Unrelated records and status / stop remain reachable during a stalled call.
+  R-WATCH stop is journaled by dispatcher; host records reason and parks / ends.
+  R-ALLSTOP journals host delivery closure / bound-board snapshots without remote lock waits.
+  Hold fences until confirmed absence; no automatic restart after either stop.
 end note
 note bottom of result
   Bind call to immutable arguments / record / daemon-instance and controller epochs.

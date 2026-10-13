@@ -17,6 +17,8 @@ state "Delivery receipt vocabulary\ndurable state owner: swarma-session-host ser
   Unknown --> Unknown : unresolved evidence; keep fence closed
   note right of Queued
     Closed fence may queue, never deliver.
+    R-ALLSTOP closes delivery for every session, snapshots bound boards;
+    confirmed absence required, explicit recovery only.
     No acknowledgement without durable host write.
     Full accepted/queued/dispatched/refused/expired transition schema:
     unspecified in spec §3.4 / §7; vocabulary is not an invented pipeline.
@@ -51,7 +53,8 @@ state "Pending native interaction / approval\nstate and authority owner: host se
 
 note bottom of Approval
   Process identities: swarma-session-host under its service account admits
-  and records; swarma-session-runner under worker-<label> owns the transport;
+  and records; swarma-session-runner under trusted worker-<label> owns the transport;
+  R-EXEC starts only admitted harness; R-STANDING surface checks precede launch / resume;
   Claude Code / private Codex app-server produces native interactions.
   Authorised caller resolves them; precise approval principal roles and
   request/ack protocol are unspecified in spec §3.4 / §7.
